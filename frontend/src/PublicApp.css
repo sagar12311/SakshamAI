@@ -1,6 +1,121 @@
-.public-shell { min-height: 100vh; padding: 48px clamp(20px, 6vw, 96px); color: #f4f6f7; background: radial-gradient(circle at top right, #173d4a, #0b1115 48%); font-family: Inter, system-ui, sans-serif; }
-.auth-shell { display: grid; place-items: center; }.auth-card { width: min(440px, 100%); padding: 32px; border: 1px solid #29414a; border-radius: 18px; background: #111c21; box-shadow: 0 20px 70px #0008; }
-.eyebrow { margin: 0; color: #78d7c9; font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }.muted { color: #afbec4; line-height: 1.55; }.auth-card h1, .chat-shell h1 { margin: 8px 0 14px; }.auth-card label { display: grid; gap: 7px; margin: 16px 0; color: #cfdbdf; font-size: .9rem; }
-.public-shell input { min-width: 0; padding: 12px; color: inherit; border: 1px solid #38515b; border-radius: 9px; background: #0a1216; }.public-shell button { padding: 11px 15px; color: #061113; border: 0; border-radius: 9px; background: #78d7c9; cursor: pointer; font-weight: 700; }.public-shell button:disabled { opacity: .6; cursor: wait; }.link-button { background: transparent !important; color: #78d7c9 !important; padding: 10px 0 !important; }.notice { color: #ffb4a9; }
-.chat-shell { max-width: 980px; margin: auto; }.chat-shell header { display: flex; justify-content: space-between; gap: 24px; align-items: start; }.provider-card, .messages { margin-top: 26px; padding: 18px; border: 1px solid #29414a; border-radius: 14px; background: #111c21; }.mode-choice { display: flex; gap: 10px; }.mode-choice button { background: #203039; color: #d9e5e8; }.mode-choice button.selected { background: #78d7c9; color: #061113; }.byok-fields { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px; }.messages { min-height: 320px; }.messages article { max-width: 80%; padding: 12px 15px; margin: 12px 0; border-radius: 12px; background: #1b2b32; }.messages article.user { margin-left: auto; background: #245052; }.messages p { white-space: pre-wrap; line-height: 1.5; }.composer { display: flex; gap: 10px; margin-top: 16px; }.composer input { flex: 1; }
-@media (max-width: 700px) { .public-shell { padding: 28px 18px; }.chat-shell header, .composer { flex-direction: column; }.composer button { width: 100%; }.byok-fields { grid-template-columns: 1fr; }.messages article { max-width: 100%; } }
+.public-shell {
+    min-height: 100vh;
+    padding: 48px clamp(20px, 6vw, 96px);
+    color: #f4f6f7;
+    background: radial-gradient(circle at top right, #173d4a, #0b1115 48%);
+    font-family: Inter, system-ui, sans-serif;
+}
+
+.auth-shell { display: grid; place-items: center; }
+
+.auth-card,
+.provider-card,
+.messages,
+.transcript-card {
+    border: 1px solid #29414a;
+    border-radius: 18px;
+    background: #111c21;
+    box-shadow: 0 20px 70px #0008;
+}
+
+.auth-card { width: min(440px, 100%); padding: 32px; }
+.eyebrow { margin: 0; color: #78d7c9; font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.muted { color: #afbec4; line-height: 1.55; }
+.auth-card h1,
+.public-header h1,
+.meeting-intro h2 { margin: 8px 0 14px; }
+
+.auth-card label,
+.file-field {
+    display: grid;
+    gap: 7px;
+    margin: 16px 0;
+    color: #cfdbdf;
+    font-size: .9rem;
+}
+
+.public-shell input {
+    min-width: 0;
+    padding: 12px;
+    color: inherit;
+    border: 1px solid #38515b;
+    border-radius: 9px;
+    background: #0a1216;
+}
+
+.public-shell button {
+    padding: 11px 15px;
+    color: #061113;
+    border: 0;
+    border-radius: 9px;
+    background: #78d7c9;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.public-shell button:disabled { opacity: .6; cursor: wait; }
+.link-button { padding: 10px 0 !important; color: #78d7c9 !important; background: transparent !important; }
+.notice { margin-top: 12px; color: #ffb4a9; }
+
+.workspace-shell { max-width: 1180px; margin: auto; }
+.public-header,
+.header-actions,
+.public-header nav,
+.mode-choice,
+.transcript-heading {
+    display: flex;
+    align-items: center;
+}
+
+.public-header { justify-content: space-between; gap: 24px; align-items: flex-start; }
+.header-actions { flex-wrap: wrap; gap: 18px; align-items: center; }
+.public-header nav { gap: 8px; }
+.public-header nav button,
+.mode-choice button { color: #d9e5e8; background: #203039; }
+.public-header nav button.selected,
+.mode-choice button.selected { color: #061113; background: #78d7c9; }
+
+.public-content { margin-top: 26px; }
+.provider-card,
+.messages,
+.transcript-card { padding: 18px; }
+.mode-choice { gap: 10px; }
+.provider-card > .muted { margin-top: 14px; }
+.byok-fields { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 14px; }
+
+.messages { min-height: 320px; margin-top: 20px; }
+.messages article { max-width: 80%; padding: 12px 15px; margin: 12px 0; border-radius: 12px; background: #1b2b32; }
+.messages article.user { margin-left: auto; background: #245052; }
+.messages p,
+.transcript-list p,
+.transcript-text { white-space: pre-wrap; line-height: 1.5; }
+.composer { display: flex; gap: 10px; margin-top: 16px; }
+.composer input { flex: 1; }
+
+.meeting-content { display: grid; gap: 20px; }
+.meeting-intro { max-width: 720px; }
+.meeting-intro h2 { font-size: clamp(1.6rem, 3vw, 2.35rem); }
+.meeting-form { display: grid; gap: 13px; }
+.meeting-form .file-field { margin: 0; }
+.file-name { color: #d9e5e8; font-size: .88rem; }
+.consent-check { display: flex; gap: 10px; align-items: flex-start; color: #d9e5e8; line-height: 1.45; }
+.consent-check input { width: 18px; height: 18px; margin-top: 2px; accent-color: #78d7c9; }
+
+.transcript-heading { justify-content: space-between; gap: 16px; }
+.transcript-heading h3 { margin: 6px 0 0; }
+.transcript-heading span { padding: 4px 9px; color: #78d7c9; border: 1px solid #38515b; border-radius: 999px; font-size: .75rem; }
+.transcript-list { margin-top: 16px; border-top: 1px solid #29414a; }
+.transcript-list article { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-bottom: 1px solid #29414a; }
+.transcript-list time { color: #78d7c9; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; }
+.transcript-text { margin-top: 18px; }
+
+@media (max-width: 700px) {
+    .public-shell { padding: 28px 18px; }
+    .public-header,
+    .header-actions,
+    .composer { align-items: stretch; flex-direction: column; }
+    .public-header nav { overflow-x: auto; }
+    .composer button { width: 100%; }
+    .byok-fields { grid-template-columns: 1fr; }
+    .messages article { max-width: 100%; }
+}

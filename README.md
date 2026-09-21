@@ -13,7 +13,7 @@ Prerequisites: macOS, Python 3.11+, Node.js 18+, and optionally an
 OpenAI-compatible local model server such as [LM Studio](https://lmstudio.ai/).
 
 ```bash
-git clone https://github.com/NEFEX-Technologies/saksham.git
+git clone https://github.com/sagar12311/SakshamAI.git
 cd saksham/backend
 python -m venv .venv
 source .venv/bin/activate
@@ -45,11 +45,17 @@ quota-limited inference gateway. It never exposes the maintainers' model,
 meeting-worker, or private-network endpoints. Hosted access is optional; this
 repository remains usable with your own local model endpoint.
 
+The browser beta supports authenticated Chat and consented Meeting Intelligence
+uploads. Users can choose Saksham-hosted capacity or an allowlisted,
+OpenAI-compatible API key for their own session. It intentionally does not
+include desktop capture, macOS automation, voice biometrics, or system control.
+
 ## Documentation
 
 - [Launchers](scripts/README.md)
 - [Chatterbox TTS](services/chatterbox_tts/README.md)
 - [Meeting Intelligence](services/meeting_intelligence/README.md)
+- [Hosted beta deployment](docs/hosted-beta.md)
 - [Security policy](SECURITY.md)
 - [Third-party and model notices](THIRD_PARTY_NOTICES.md)
 
