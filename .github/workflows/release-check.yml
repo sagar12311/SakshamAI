@@ -39,7 +39,19 @@ jobs:
         run: npm ci
       - name: Build public beta frontend
         working-directory: frontend
-        run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://ci-project.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_ci_not_a_real_key
+          VITE_SAKSHAM_GATEWAY_URL: https://api.saksham.ai
+        run: npm run build:public
       - name: Test public beta frontend
         working-directory: frontend
         run: npm test -- --run
+
+  deployment-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate containers and Postgres without a tunnel or GPU
+        run: bash tools/smoke-public.sh

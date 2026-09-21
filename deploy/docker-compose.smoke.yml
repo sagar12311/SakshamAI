@@ -1,0 +1,39 @@
+# Disposable local validation; no tunnel, host mounts, or GPU endpoints.
+services:
+  gateway:
+    image: saksham-public-gateway:smoke
+    build:
+      context: ../gateway
+    environment:
+      SUPABASE_URL: https://smoke.invalid
+      DATABASE_URL: postgresql://smoke:smoke-only-password@postgres:5432/smoke
+      HOSTED_LLM_BASE_URL: http://127.0.0.1:9/v1
+      HOSTED_LLM_API_KEY: smoke-only-key
+      MEETING_WORKER_URL: http://127.0.0.1:9
+      MEETING_WORKER_API_KEY: smoke-only-key
+      HOSTED_ENABLED: "false"
+      BETA_INVITE_ONLY: "true"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [smoke]
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: smoke
+      POSTGRES_DB: smoke
+      POSTGRES_PASSWORD: smoke-only-password
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smoke -d smoke"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [smoke]
+networks:
+  smoke:
+    internal: true

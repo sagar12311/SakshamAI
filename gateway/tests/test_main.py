@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
+from types import SimpleNamespace
 import wave
 from io import BytesIO
 
 import pytest
 from fastapi import HTTPException, UploadFile
 from fastapi.testclient import TestClient
+from cryptography.hazmat.primitives.asymmetric import ec
+import jwt
 
 os.environ.update({
     "SUPABASE_URL": "https://project.supabase.co",
@@ -135,6 +139,7 @@ def test_byok_meeting_upload_uses_the_authenticated_gateway_contract(monkeypatch
 
 
 def test_failed_hosted_chat_refunds_its_reservation_and_releases_capacity(monkeypatch) -> None:
+    monkeypatch.setattr(main.settings(), "hosted_enabled", True)
     class Quota:
         def __init__(self):
             self.calls: list[tuple[str, int]] = []
@@ -157,3 +162,69 @@ def test_failed_hosted_chat_refunds_its_reservation_and_releases_capacity(monkey
     assert quota.calls[0][0] == "reserve"
     assert quota.calls[-1] == ("settle", 0)
     assert not slots.locked()
+
+
+def test_hosted_disabled_cannot_select_a_gpu(monkeypatch):
+    monkeypatch.setattr(main.settings(), "hosted_enabled", False)
+    request = main.ChatRequest(messages=[main.ChatMessage(role="user", content="hello")])
+    with pytest.raises(HTTPException, match="not enabled"):
+        asyncio.run(main.chat(request, main.User(id="user-1"), None))
+
+
+def test_hosted_model_is_operator_selected():
+    request = main.ChatRequest(messages=[main.ChatMessage(role="user", content="hello")], model="unapproved-large-model")
+    assert main.select_provider(request, None)[2] == main.settings().hosted_llm_model
+
+
+def test_token_reservation_accounts_for_multibyte_text():
+    content = "नमस्ते 🌍"
+    messages = [main.ChatMessage(role="user", content=content)]
+    assert main.estimate_tokens(messages) >= len(content.encode("utf-8"))
+
+
+@pytest.mark.parametrize("url", [
+    "https://user:password@api.openai.com/v1",
+    "https://api.openai.com:8443/v1",
+    "https://api.openai.com/v1?target=private",
+    "https://api.openai.com/v1#fragment",
+    "http://api.openai.com/v1",
+    "https://127.0.0.1/v1",
+])
+def test_byok_rejects_unsafe_provider_urls(url):
+    request = main.ChatRequest(messages=[main.ChatMessage(role="user", content="hello")], mode="byok", provider_url=url)
+    with pytest.raises(HTTPException, match="not allowed"):
+        main.select_provider(request, "session-only-key")
+
+
+def test_first_request_cannot_bypass_quota():
+    quota = main.QuotaStore(None, 100, 200, 1, 2)
+    with pytest.raises(HTTPException, match="exceeds"):
+        asyncio.run(quota.reserve_tokens("new-user", 101))
+    with pytest.raises(HTTPException, match="exceeds"):
+        asyncio.run(quota.reserve_meeting("new-user", 61))
+
+
+@pytest.mark.parametrize("invited,anonymous,role,expected", [
+    (True, False, "authenticated", 200),
+    (False, False, "authenticated", 403),
+    (True, True, "authenticated", 401),
+    (True, False, "service_role", 401),
+])
+def test_signed_sessions_require_registered_invited_user(monkeypatch, invited, anonymous, role, expected):
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    lookup = SimpleNamespace(get_signing_key_from_jwt=lambda _: SimpleNamespace(key=private_key.public_key()))
+    monkeypatch.setattr(main, "jwks_client", lambda _: lookup)
+    monkeypatch.setattr(main.settings(), "beta_invite_only", True)
+    monkeypatch.setattr(main.settings(), "beta_user_ids", ["test-user"] if invited else [])
+    claims = {
+        "sub": "test-user", "role": role, "is_anonymous": anonymous,
+        "aud": "authenticated", "iss": "https://project.supabase.co/auth/v1",
+        "iat": int(time.time()), "exp": int(time.time()) + 60,
+    }
+    token = jwt.encode(claims, private_key, algorithm="ES256")
+    if expected == 200:
+        assert asyncio.run(main.get_user(f"Bearer {token}")).id == "test-user"
+    else:
+        with pytest.raises(HTTPException) as result:
+            asyncio.run(main.get_user(f"Bearer {token}"))
+        assert result.value.status_code == expected

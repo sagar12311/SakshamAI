@@ -6,17 +6,103 @@ LM Studio, Chatterbox, or Meeting Intelligence worker directly through Cloudflar
 
 ## Deploy
 
-1. Create a Supabase project and configure email/password authentication.
-   Require confirmed email addresses. Before opening sign-up broadly, enable
-   CAPTCHA or use an invite/allowlist so a home GPU cannot be exhausted through
-   bulk account creation.
-2. Create a named Cloudflare Tunnel and route `api.saksham.ai` to the
-   `cloudflared` service. Do not use a Quick Tunnel for production.
-3. Copy `deploy/.env.example` to `deploy/.env`, generate unique passwords and
-   worker keys, and set the real Supabase URL.
-4. From `deploy`, run `docker compose -f docker-compose.public.yml up -d --build`.
-5. Configure the website to send Supabase access tokens to
-   `https://api.saksham.ai/v1/*`.
+Deployment requires operator access to Supabase, Cloudflare, and DNS for
+`saksham.ai`. Do not paste private keys into issues, chat, or browser build
+variables. This repository contains templates, not live production secrets.
+
+### 1. Supabase
+
+Create/select a Free project, enable email/password authentication and email
+confirmation, and use an asymmetric JWT signing key (ES256 or RS256). Legacy
+HS256 projects must migrate signing keys before using this gateway's JWKS
+validation. Disable anonymous sign-in. Set the Auth Site URL to
+`https://saksham.ai` and allow only your intended confirmation/redirect URLs.
+
+Copy the project URL and **publishable** key (or legacy **anon** key) into the
+frontend build settings below. Never use the service-role/secret key there.
+The gateway validates sessions using public signing keys; it needs no Supabase
+service-role key.
+
+Create your test account and add its UUID from Supabase Auth Users to the
+private `BETA_USER_IDS` JSON list. The initial deployment is invite-only:
+registration alone does not grant GPU or BYOK gateway access.
+
+### 2. Cloudflare Pages frontend
+
+Connect the `sagar12311/SakshamAI` repository using these settings:
+
+| Setting | Value |
+| --- | --- |
+| Production branch | `public-beta` |
+| Root directory | `frontend` |
+| Node version | `24` (`NODE_VERSION` build variable) |
+| Build command | `npm run build:public` |
+| Output directory | `dist-public` |
+| `VITE_SUPABASE_URL` | Your Supabase HTTPS project URL |
+| `VITE_SUPABASE_ANON_KEY` | Your publishable/anon key |
+| `VITE_SAKSHAM_GATEWAY_URL` | `https://api.saksham.ai` |
+
+The dedicated public entry does not import the desktop app or its local API
+proxies. The build fails when configuration is missing or a privileged
+Supabase key is detected. `VITE_PUBLIC_BETA` is not needed by this build.
+No tunnel tokens, model keys, or production env files belong in Pages.
+
+Add `saksham.ai` as a Pages custom domain after reviewing the preview. If using
+another domain or a custom Supabase hostname, update both the gateway's exact
+`CORS_ORIGINS` and `frontend/public-beta/_headers` connect-src policy before
+rebuilding. Do not allow arbitrary preview origins access to your gateway.
+
+### 3. Home gateway (local validation first)
+
+Create a private `deploy/.env` from the example. Generate a random URL-safe
+Postgres password (e.g. `openssl rand -hex 32`). Compose constructs the database
+URL from this password; it passes each service only its own configuration.
+Point workers at a dedicated beta instance with separate credentials and no
+personal data directories. Keep `HOSTED_ENABLED=false` initially.
+
+From the repository root:
+
+```bash
+python3 tools/check_deployment.py --env-file deploy/.env
+docker compose --env-file deploy/.env -f deploy/docker-compose.public.yml up -d --build --wait
+curl --fail http://127.0.0.1:8080/ready
+```
+
+This starts only Postgres and the gateway, bound to loopback. Keep one gateway
+replica and one Uvicorn worker: the concurrency gate is per process and only
+coordinates requests through this gateway, not personal or other GPU jobs.
+Choose quotas after measuring your GPU; the defaults are starting limits,
+not a hardware safety guarantee.
+
+### 4. Tunnel and first invited-user test
+
+Create a named, remotely managed Cloudflare Tunnel. Its published application
+route must be `api.saksham.ai` → **HTTP `gateway:8080`**. The tunnel connector
+is `cloudflared`; the destination service is `gateway`, not `cloudflared` or
+`localhost`. Do not route private worker/model ports or private subnets.
+Put the connector token only in your private deployment env file.
+
+```bash
+python3 tools/check_deployment.py --env-file deploy/.env --public
+docker compose --env-file deploy/.env -f deploy/docker-compose.public.yml --profile public up -d --build --wait
+```
+
+Sign in as the invited user and test BYOK with your own provider key. Once the
+dedicated inference endpoints are verified, set `HOSTED_ENABLED=true` privately
+and recreate the gateway. Confirm a non-invited account gets 403, a request
+without a session gets 401, and personal/worker routes get 404. Keep beta access
+invite-only until ingress rate limiting and load testing are complete; upload
+length checks alone are not full denial-of-service protection.
+
+To stop public traffic while keeping local services running:
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.public.yml --profile public stop cloudflared
+```
+
+References: [Cloudflare Pages build settings](https://developers.cloudflare.com/pages/configuration/build-configuration/),
+[Tunnel tokens](https://developers.cloudflare.com/tunnel/reference/tunnel-tokens/),
+[Supabase JWT signing keys](https://supabase.com/docs/guides/auth/signing-keys).
 
 ## Meeting Intelligence
 
@@ -50,8 +136,17 @@ The Gateway Docker image uses Python 3.12. From the repository root, run:
 python3.12 -m venv .gateway-venv
 .gateway-venv/bin/pip install -r gateway/requirements-dev.txt
 PYTHONPATH=gateway .gateway-venv/bin/pytest gateway/tests -q
-(cd frontend && npm ci && npm run build && npm test -- --run)
+(cd frontend && npm ci && npm run build:public && npm test -- --run)
+bash tools/smoke-public.sh
 ```
+
+The frontend command requires the three public build variables listed above.
+The Docker smoke test builds the real gateway image on a disposable private
+network, checks readiness and unauthenticated access, and exercises quotas
+against real Postgres (including fresh accounts, global rollback, and concurrent
+reservations). It uses no GPU, tunnel, production secrets, or host mounts and
+removes only its own containers afterward. CI also builds the separate public
+frontend with fake public configuration.
 
 ## Safety properties
 

@@ -4,10 +4,31 @@ services:
   gateway:
     build:
       context: ../gateway
-    env_file: .env
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL:?set the Supabase project URL}
+      DATABASE_URL: postgresql://saksham_gateway:${POSTGRES_PASSWORD:?set a strong URL-safe password}@postgres:5432/saksham_gateway
+      HOSTED_LLM_BASE_URL: ${HOSTED_LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+      HOSTED_LLM_API_KEY: ${HOSTED_LLM_API_KEY:-}
+      HOSTED_LLM_MODEL: ${HOSTED_LLM_MODEL:-openai/gpt-oss-20b}
+      MEETING_WORKER_URL: ${MEETING_WORKER_URL:-http://host.docker.internal:8110}
+      MEETING_WORKER_API_KEY: ${MEETING_WORKER_API_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["https://saksham.ai"]}
+      ALLOWED_BYOK_HOSTS: ${ALLOWED_BYOK_HOSTS:-["api.openai.com"]}
+      HOSTED_ENABLED: ${HOSTED_ENABLED:-false}
+      BETA_INVITE_ONLY: ${BETA_INVITE_ONLY:-true}
+      BETA_USER_IDS: ${BETA_USER_IDS:-[]}
+      DAILY_TOKEN_LIMIT: ${DAILY_TOKEN_LIMIT:-10000}
+      DAILY_GLOBAL_TOKEN_LIMIT: ${DAILY_GLOBAL_TOKEN_LIMIT:-50000}
+      MAX_OUTPUT_TOKENS: ${MAX_OUTPUT_TOKENS:-1024}
+      DAILY_MEETING_MINUTES: ${DAILY_MEETING_MINUTES:-30}
+      DAILY_GLOBAL_MEETING_MINUTES: ${DAILY_GLOBAL_MEETING_MINUTES:-120}
+      MAX_HOSTED_MEETING_UPLOAD_SECONDS: ${MAX_HOSTED_MEETING_UPLOAD_SECONDS:-900}
+      MAX_CONCURRENT_HOSTED_JOBS: 1
     restart: unless-stopped
     read_only: true
     tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     depends_on:
       postgres:
         condition: service_healthy
@@ -35,9 +56,14 @@ services:
 
   cloudflared:
     image: cloudflare/cloudflared:latest
+    profiles: [public]
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set a tunnel token}
-    depends_on: [gateway]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      gateway:
+        condition: service_healthy
     networks: [edge]
 
 networks:

@@ -10,6 +10,7 @@
         "dev": "vite",
         "test": "vitest run",
         "build": "tsc && vite build",
+        "build:public": "tsc && vite build --config vite.public.config.ts --mode public",
         "preview": "vite preview",
         "electron:dev": "concurrently \"vite\" \"tsc -p tsconfig.electron.json --watch\" \"wait-on http://localhost:5173 dist-electron/main.js && electron .\"",
         "electron:build": "tsc -p tsconfig.electron.json && vite build && electron-builder"

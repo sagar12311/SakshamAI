@@ -15,6 +15,7 @@ __pycache__/
 *$py.class
 venv/
 .venv/
+.gateway-venv/
 .DS_Store
 .pytest_cache/
 .mypy_cache/
@@ -43,6 +44,7 @@ chroma_db/
 # Node
 node_modules/
 dist/
+dist-public/
 dist-electron/
 .vite/
 .env.local

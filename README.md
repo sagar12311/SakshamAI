@@ -14,7 +14,7 @@ OpenAI-compatible local model server such as [LM Studio](https://lmstudio.ai/).
 
 ```bash
 git clone https://github.com/sagar12311/SakshamAI.git
-cd saksham/backend
+cd SakshamAI/backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .

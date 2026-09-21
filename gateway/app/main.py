@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     daily_global_meeting_minutes: int = 120
     max_hosted_meeting_upload_seconds: int = Field(default=900, ge=1, le=3_600)
     max_concurrent_hosted_jobs: int = Field(default=1, ge=1, le=4)
+    hosted_enabled: bool = False
+    beta_invite_only: bool = True
+    beta_user_ids: list[str] = []
 
     @property
     def jwks_url(self) -> str:
@@ -53,7 +56,8 @@ def settings() -> Settings:
 
 @lru_cache
 def jwks_client(jwks_url: str) -> jwt.PyJWKClient:
-    return jwt.PyJWKClient(jwks_url, cache_keys=True)
+    # Refresh the set regularly so revoked keys do not remain cached forever.
+    return jwt.PyJWKClient(jwks_url, cache_keys=False, lifespan=300, timeout=5)
 
 
 class ChatMessage(BaseModel):
@@ -98,6 +102,8 @@ class QuotaStore:
         """)
 
     async def reserve_tokens(self, user_id: str, amount: int) -> None:
+        if amount <= 0 or amount > min(self.limit, self.global_limit):
+            raise HTTPException(429, "Request exceeds the daily hosted token limit")
         async with self.pool.acquire() as connection, connection.transaction():
             row = await connection.fetchrow("""
           INSERT INTO saksham_daily_quota (user_id, usage_day, reserved_tokens)
@@ -127,6 +133,8 @@ class QuotaStore:
                 """, quota_user_id, reserved, actual)
 
     async def reserve_meeting(self, user_id: str, seconds: int) -> None:
+        if seconds <= 0 or seconds > min(self.meeting_minutes, self.global_meeting_minutes) * 60:
+            raise HTTPException(429, "Recording exceeds the daily hosted meeting limit")
         async with self.pool.acquire() as connection, connection.transaction():
             row = await connection.fetchrow("""
           INSERT INTO saksham_daily_quota (user_id, usage_day, meeting_seconds)
@@ -162,22 +170,32 @@ async def get_user(authorization: str = Header(default="")) -> User:
     token = authorization.removeprefix("Bearer ").strip()
     try:
         key = await asyncio.to_thread(jwks_client(settings().jwks_url).get_signing_key_from_jwt, token)
-        claims = jwt.decode(token, key.key, algorithms=[key.algorithm_name], audience="authenticated",
+        claims = jwt.decode(token, key.key, algorithms=["RS256", "ES256"], audience="authenticated",
+                            options={"require": ["exp", "iat", "sub", "aud", "iss"]},
                             issuer=f"{str(settings().supabase_url).rstrip('/')}/auth/v1")
-        return User(id=str(claims["sub"]), email=claims.get("email"))
+        if claims.get("role") != "authenticated" or claims.get("is_anonymous", False):
+            raise ValueError("A registered user session is required")
+        user = User(id=str(claims["sub"]), email=claims.get("email"))
     except Exception as error:
         raise HTTPException(401, "Invalid or expired session") from error
+    if settings().beta_invite_only and user.id not in settings().beta_user_ids:
+        raise HTTPException(403, "Your account is awaiting beta access")
+    return user
 
 
 def estimate_tokens(messages: list[ChatMessage]) -> int:
-    return max(1, math.ceil(sum(len(message.content) for message in messages) / 4))
+    # Conservative admission budget for byte-based tokenizers, including framing.
+    # Actual provider usage settles the reservation after inference.
+    return 16 + sum(len(message.content.encode("utf-8")) + 16 for message in messages)
 
 
 def select_byok_provider(provider_url: HttpUrl | None, byok_key: str | None, model: str | None, default_model: str) -> tuple[str, str, str]:
     if not byok_key or not provider_url:
         raise HTTPException(400, "BYOK requires a provider URL and API key")
     parsed = urlparse(str(provider_url))
-    if parsed.scheme != "https" or parsed.hostname not in settings().allowed_byok_hosts:
+    if (parsed.scheme != "https" or parsed.hostname not in settings().allowed_byok_hosts
+            or parsed.username or parsed.password or parsed.port not in (None, 443)
+            or parsed.query or parsed.fragment):
         raise HTTPException(400, "That BYOK provider is not allowed")
     return str(provider_url).rstrip("/"), byok_key, model or default_model
 
@@ -185,7 +203,7 @@ def select_byok_provider(provider_url: HttpUrl | None, byok_key: str | None, mod
 def select_provider(request: ChatRequest, byok_key: str | None) -> tuple[str, str, str]:
     configured = settings()
     if request.mode == "hosted":
-        return str(configured.hosted_llm_base_url).rstrip("/"), configured.hosted_llm_api_key, request.model or configured.hosted_llm_model
+        return str(configured.hosted_llm_base_url).rstrip("/"), configured.hosted_llm_api_key, configured.hosted_llm_model
     return select_byok_provider(request.provider_url, byok_key, request.model, configured.hosted_llm_model)
 
 
@@ -235,6 +253,7 @@ async def lifespan(app: FastAPI):
         configured.daily_global_meeting_minutes,
     )
     app.state.hosted_gpu_slots = asyncio.BoundedSemaphore(configured.max_concurrent_hosted_jobs)
+    app.state.pool = pool
     await app.state.quota.initialize()
     yield
     await pool.close()
@@ -264,11 +283,22 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/ready")
+async def ready():
+    try:
+        await app.state.pool.fetchval("SELECT 1", timeout=2)
+    except Exception as error:
+        raise HTTPException(503, "Gateway is not ready") from error
+    return {"status": "ready"}
+
+
 @app.post("/v1/chat/completions")
 async def chat(request: ChatRequest, user: User = Depends(get_user), byok_key: str | None = Header(default=None, alias="X-Saksham-Provider-Key")):
     configured = settings()
     maximum = min(request.max_tokens, configured.max_output_tokens)
     is_hosted = request.mode == "hosted"
+    if is_hosted and not configured.hosted_enabled:
+        raise HTTPException(503, "Hosted beta is not enabled yet")
     slots: asyncio.BoundedSemaphore | None = None
     reserved = 0
     quota_reserved = False
@@ -303,10 +333,12 @@ async def chat(request: ChatRequest, user: User = Depends(get_user), byok_key: s
     except httpx.HTTPError as error:
         raise HTTPException(503, "Inference provider is unavailable") from error
     finally:
-        if quota_reserved:
-            await app.state.quota.settle_tokens(user.id, reserved, actual)
-        if slots:
-            slots.release()
+        try:
+            if quota_reserved:
+                await app.state.quota.settle_tokens(user.id, reserved, actual)
+        finally:
+            if slots:
+                slots.release()
 
 
 @app.post("/v1/meetings/transcribe")
@@ -321,6 +353,8 @@ async def transcribe(
 ):
     if not consent_confirmed:
         raise HTTPException(400, "Recording consent is required")
+    if mode == "hosted" and not settings().hosted_enabled:
+        raise HTTPException(503, "Hosted beta is not enabled yet")
     payload = await read_limited(audio, settings().max_audio_bytes)
     hosted_seconds = validate_audio_upload(audio, payload, mode)
     if mode == "byok":
