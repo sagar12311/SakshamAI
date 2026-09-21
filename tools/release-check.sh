@@ -16,12 +16,16 @@ test -f CONTRIBUTING.md || fail "CONTRIBUTING.md is missing"
 for forbidden in \
   'backend/.venv' 'frontend/node_modules' 'frontend/dist' 'frontend/dist-electron' \
   'backend/models' 'services/meeting_intelligence.zip'; do
-  test ! -e "$forbidden" || fail "forbidden release artifact: $forbidden"
+  git ls-files --error-unmatch "$forbidden" >/dev/null 2>&1 && fail "forbidden release artifact is tracked: $forbidden"
 done
 
-if find . -type f \( -name '.env' -o -name '*.log' -o -name '*.db' -o -name '*.sqlite*' \
+if git ls-files | rg '(^|/)(\.env|.*\.log|.*\.db|.*\.sqlite[^/]*|.*\.onnx|.*\.wav|.*\.dmg|.*\.zip)$' -q; then
+  fail "private data, model, or generated artifact is tracked"
+fi
+
+if find . -path './.git' -prune -o -type f \( -name '.env' -o -name '*.log' -o -name '*.db' -o -name '*.sqlite*' \
   -o -name '*.onnx' -o -name '*.wav' -o -name '*.dmg' -o -name '*.zip' \) -print -quit | grep -q .; then
-  fail "private data, model, or generated artifact found"
+  fail "private data, model, or generated artifact found outside ignored development files"
 fi
 
 if rg -n --hidden --glob '!.git/**' \
