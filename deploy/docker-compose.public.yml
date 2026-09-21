@@ -1,0 +1,49 @@
+name: saksham-public
+
+services:
+  gateway:
+    build:
+      context: ../gateway
+    env_file: .env
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [edge, private]
+    ports:
+      - "127.0.0.1:8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: saksham_gateway
+      POSTGRES_USER: saksham_gateway
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a strong password}
+    volumes:
+      - gateway-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saksham_gateway -d saksham_gateway"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [private]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set a tunnel token}
+    depends_on: [gateway]
+    networks: [edge]
+
+networks:
+  edge: {}
+  private:
+    internal: true
+
+volumes:
+  gateway-postgres: {}
