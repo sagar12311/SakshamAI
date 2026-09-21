@@ -3,6 +3,9 @@
     "version": "0.1.0",
     "description": "Saksham AI - Your Personal Jarvis",
     "main": "dist-electron/main.js",
+    "engines": {
+        "node": ">=24"
+    },
     "scripts": {
         "dev": "vite",
         "test": "vitest run",

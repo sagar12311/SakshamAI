@@ -9,7 +9,7 @@ meeting intelligence, and opt-in macOS automation.
 
 ## Quick start: local/self-hosted
 
-Prerequisites: macOS, Python 3.11+, Node.js 18+, and optionally an
+Prerequisites: macOS, Python 3.11+, Node.js 24+, and optionally an
 OpenAI-compatible local model server such as [LM Studio](https://lmstudio.ai/).
 
 ```bash
