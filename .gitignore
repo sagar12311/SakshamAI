@@ -1,0 +1,55 @@
+# Private configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.macos.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local models, user content, recordings, and application state
+backend/models/
+services/**/models/
+services/**/.cache/
+services/**/voices/*
+!services/chatterbox_tts/voices/.gitkeep
+.saksham/
+brain/
+logs/
+chroma_db/
+*.db
+*.sqlite
+*.sqlite3
+*.wav
+*.mp3
+*.m4a
+*.webm
+*.ogg
+*.flac
+
+# Node
+node_modules/
+dist/
+dist-electron/
+.vite/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.log
+*.zip
+*.dmg
+*.blockmap

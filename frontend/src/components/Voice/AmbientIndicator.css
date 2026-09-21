@@ -1,0 +1,69 @@
+.ambient-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.ambient-indicator:hover {
+    background: var(--bg-glass);
+    color: var(--text-secondary);
+}
+
+.ambient-indicator.active {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+}
+
+.ambient-indicator.denied {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+.pulse-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    border: 2px solid #10b981;
+    border-radius: var(--radius-full);
+    transform: translate(-50%, -50%);
+    animation: ambient-pulse 2s ease-out infinite;
+}
+
+@keyframes ambient-pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1.5);
+        opacity: 0;
+    }
+}
+
+.ambient-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ambient-label {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}

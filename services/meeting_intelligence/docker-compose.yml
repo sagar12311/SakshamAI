@@ -1,0 +1,35 @@
+services:
+  meeting-intelligence:
+    platform: linux/amd64
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8110:8110"
+    environment:
+      MEETING_INTELLIGENCE_API_KEY: ${MEETING_INTELLIGENCE_API_KEY:?Set the worker API key}
+      HF_TOKEN: ${HF_TOKEN:?Set the Hugging Face token}
+      MEETING_INTELLIGENCE_DEVICE: ${MEETING_INTELLIGENCE_DEVICE:-cuda}
+      MEETING_ASR_MODEL: ${MEETING_ASR_MODEL:-large-v3-turbo}
+      MEETING_DIARIZATION_MODEL: ${MEETING_DIARIZATION_MODEL:-pyannote/speaker-diarization-community-1}
+      MEETING_EMBEDDING_MODEL: ${MEETING_EMBEDDING_MODEL:-pyannote/wespeaker-voxceleb-resnet34-LM}
+      MEETING_GPU_MIN_FREE_MB: ${MEETING_GPU_MIN_FREE_MB:-4500}
+      ADMIN_VOICE_AUTH_ENABLED: ${ADMIN_VOICE_AUTH_ENABLED:-true}
+      ADMIN_ANTISPOOF_ARCHITECTURE: ${ADMIN_ANTISPOOF_ARCHITECTURE:-/opt/aasist/models/AASIST.py}
+      ADMIN_ANTISPOOF_MODEL: ${ADMIN_ANTISPOOF_MODEL:-/opt/aasist/models/weights/AASIST.pth}
+      ADMIN_SPEAKER_THRESHOLD: ${ADMIN_SPEAKER_THRESHOLD:-0.82}
+      ADMIN_LIVENESS_THRESHOLD: ${ADMIN_LIVENESS_THRESHOLD:-0.90}
+      PYANNOTE_METRICS_ENABLED: "0"
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
+      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-0}
+    volumes:
+      - meeting-models:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  meeting-models:

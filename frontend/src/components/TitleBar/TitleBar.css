@@ -1,0 +1,44 @@
+.titlebar {
+    -webkit-app-region: drag;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 var(--spacing-sm);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.titlebar-drag {
+    flex: 1;
+}
+
+.titlebar-controls {
+    -webkit-app-region: no-drag;
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.titlebar-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.titlebar-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.titlebar-btn.close:hover {
+    background: var(--danger);
+    color: white;
+}

@@ -1,0 +1,22 @@
+services:
+  chatterbox-tts:
+    build:
+      context: .
+    image: saksham/chatterbox-tts:local
+    container_name: saksham-chatterbox-tts
+    restart: unless-stopped
+    env_file:
+      - ${TTS_ENV_FILE:-.env}
+    ports:
+      - "${TTS_BIND_ADDRESS:-127.0.0.1}:${TTS_PORT:-8100}:8100"
+    volumes:
+      - chatterbox-model-cache:/models/huggingface
+      - ./voices:/voices:ro
+    gpus: all
+    shm_size: "2gb"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "${NVIDIA_VISIBLE_DEVICES:-all}"
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+volumes:
+  chatterbox-model-cache:

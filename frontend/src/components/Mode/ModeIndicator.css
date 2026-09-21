@@ -1,0 +1,31 @@
+.mode-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    color: var(--mode-color);
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mode-indicator:hover {
+    background: var(--bg-glass);
+    border-color: var(--mode-color);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--mode-color) 20%, transparent);
+}
+
+.mode-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mode-label {
+    color: var(--text-primary);
+}
