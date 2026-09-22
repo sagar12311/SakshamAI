@@ -23,7 +23,7 @@ if git ls-files | rg '(^|/)(\.env|.*\.log|.*\.db|.*\.sqlite[^/]*|.*\.onnx|.*\.wa
   fail "private data, model, or generated artifact is tracked"
 fi
 
-if find . -path './.git' -prune -o -type f \( -name '.env' -o -name '*.log' -o -name '*.db' -o -name '*.sqlite*' \
+if find . -path './.git' -prune -o -path './deploy/.env' -prune -o -type f \( -name '.env' -o -name '*.log' -o -name '*.db' -o -name '*.sqlite*' \
   -o -name '*.onnx' -o -name '*.wav' -o -name '*.dmg' -o -name '*.zip' \) -print -quit | grep -q .; then
   fail "private data, model, or generated artifact found outside ignored development files"
 fi

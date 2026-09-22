@@ -1,6 +1,8 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient, type Session } from '@supabase/supabase-js';
+import { Clock3, FileText, Mic2, Radio, ShieldCheck, Square, Users } from 'lucide-react';
 import './PublicApp.css';
+import './components/Meeting/MeetingWorkspace.css';
 
 type Message = { role: 'user' | 'assistant'; content: string };
 type Mode = 'hosted' | 'byok';
@@ -20,7 +22,6 @@ type TranscriptionResponse = {
     model?: string | null;
 };
 
-const maxAudioBytes = 25 * 1024 * 1024;
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 const gatewayUrl = (import.meta.env.VITE_SAKSHAM_GATEWAY_URL as string | undefined)?.replace(/\/$/, '');
@@ -38,6 +39,32 @@ function normalizedSegments(result: TranscriptionResponse | null) {
         end: typeof segment.end_ms === 'number' ? segment.end_ms : Math.round((segment.end ?? 0) * 1000),
         text: segment.text?.trim() ?? '',
     })).filter(segment => segment.text);
+}
+
+function pcmFramesToWav(frames: ArrayBuffer[], sampleRate = 16_000): Blob {
+    const pcmBytes = frames.reduce((total, frame) => total + frame.byteLength, 0);
+    const output = new ArrayBuffer(44 + pcmBytes);
+    const view = new DataView(output);
+    const write = (offset: number, value: string) => [...value].forEach((character, index) => view.setUint8(offset + index, character.charCodeAt(0)));
+    write(0, 'RIFF');
+    view.setUint32(4, 36 + pcmBytes, true);
+    write(8, 'WAVE');
+    write(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    write(36, 'data');
+    view.setUint32(40, pcmBytes, true);
+    let offset = 44;
+    for (const frame of frames) {
+        new Uint8Array(output, offset, frame.byteLength).set(new Uint8Array(frame));
+        offset += frame.byteLength;
+    }
+    return new Blob([output], { type: 'audio/wav' });
 }
 
 function AuthScreen({ onSession }: { onSession: (session: Session) => void }) {
@@ -136,34 +163,101 @@ function PublicChat({ session }: { session: Session }) {
 }
 
 export function PublicMeetings({ session, gateway = gatewayUrl }: { session: Session; gateway?: string }) {
-    const [file, setFile] = useState<File | null>(null);
     const [consent, setConsent] = useState(false);
     const [mode, setMode] = useState<Mode>('hosted');
     const [providerUrl, setProviderUrl] = useState('https://api.openai.com/v1');
     const [providerKey, setProviderKey] = useState('');
     const [model, setModel] = useState('gpt-4o-mini-transcribe');
     const [result, setResult] = useState<TranscriptionResponse | null>(null);
-    const [busy, setBusy] = useState(false);
+    const [captureState, setCaptureState] = useState<'ready' | 'recording' | 'processing'>('ready');
     const [error, setError] = useState('');
+    const [elapsed, setElapsed] = useState(0);
     const segments = normalizedSegments(result);
+    const streamRef = useRef<MediaStream | null>(null);
+    const contextRef = useRef<AudioContext | null>(null);
+    const workletRef = useRef<AudioWorkletNode | null>(null);
+    const framesRef = useRef<ArrayBuffer[]>([]);
+    const startedAtRef = useRef(0);
 
-    const upload = async (event: FormEvent) => {
-        event.preventDefault();
-        if (!file || busy || !gateway) return;
-        if (!consent) return setError('Confirm that every participant has consented before uploading.');
-        if (file.size > maxAudioBytes) return setError('Choose an audio file smaller than 25 MB.');
+    useEffect(() => () => {
+        streamRef.current?.getTracks().forEach(track => track.stop());
+        workletRef.current?.disconnect();
+        void contextRef.current?.close();
+    }, []);
+
+    useEffect(() => {
+        if (captureState !== 'recording') return;
+        const timer = window.setInterval(() => setElapsed(Date.now() - startedAtRef.current), 250);
+        return () => window.clearInterval(timer);
+    }, [captureState]);
+
+    const closeCapture = async () => {
+        workletRef.current?.port.postMessage({ type: 'flush' });
+        await new Promise(resolve => window.setTimeout(resolve, 120));
+        streamRef.current?.getTracks().forEach(track => track.stop());
+        workletRef.current?.disconnect();
+        await contextRef.current?.close().catch(() => undefined);
+        streamRef.current = null;
+        workletRef.current = null;
+        contextRef.current = null;
+    };
+
+    const startRecording = async () => {
+        if (!consent || captureState !== 'ready') return;
         if (mode === 'byok' && !providerKey) return setError('Enter your provider key for this session.');
+        try {
+            setError('');
+            setResult(null);
+            framesRef.current = [];
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+            });
+            const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+            if (!AudioContextClass) throw new Error('This browser does not support microphone capture.');
+            const context = new AudioContextClass({ latencyHint: 'interactive' });
+            await context.audioWorklet.addModule('/meeting-audio-worklet.js');
+            if (context.state === 'suspended') await context.resume();
+            const source = context.createMediaStreamSource(stream);
+            const worklet = new AudioWorkletNode(context, 'saksham-meeting-capture', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+            const mute = context.createGain();
+            mute.gain.value = 0;
+            worklet.port.onmessage = (event) => {
+                if (event.data?.type === 'pcm' && event.data.pcm instanceof ArrayBuffer) framesRef.current.push(event.data.pcm);
+            };
+            source.connect(worklet);
+            worklet.connect(mute);
+            mute.connect(context.destination);
+            streamRef.current = stream;
+            contextRef.current = context;
+            workletRef.current = worklet;
+            startedAtRef.current = Date.now();
+            setElapsed(0);
+            setCaptureState('recording');
+        } catch (captureError) {
+            await closeCapture();
+            setError(captureError instanceof Error ? captureError.message : 'Microphone capture could not start.');
+        }
+    };
 
+    const stopRecording = async () => {
+        if (captureState !== 'recording' || !gateway) return;
+        if (mode === 'byok' && !providerKey) return setError('Enter your provider key for this session.');
+        setCaptureState('processing');
+        setError('');
+        await closeCapture();
+        const audio = pcmFramesToWav(framesRef.current);
+        framesRef.current = [];
+        if (audio.size <= 44) {
+            setCaptureState('ready');
+            return setError('No microphone audio was captured. Please try again.');
+        }
         const form = new FormData();
-        form.append('audio', file, file.name);
+        form.append('audio', audio, 'live-meeting.wav');
         form.append('mode', mode);
         if (mode === 'byok') {
             form.append('provider_url', providerUrl);
             form.append('model', model || 'gpt-4o-mini-transcribe');
         }
-        setBusy(true);
-        setError('');
-        setResult(null);
         try {
             const response = await fetch(`${gateway}/v1/meetings/transcribe`, {
                 method: 'POST',
@@ -177,43 +271,35 @@ export function PublicMeetings({ session, gateway = gatewayUrl }: { session: Ses
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(payload.detail || 'Unable to transcribe this recording.');
             setResult(payload as TranscriptionResponse);
-            setFile(null);
         } catch (requestError) {
             setError(requestError instanceof Error ? requestError.message : 'Unable to transcribe this recording.');
         } finally {
-            setBusy(false);
+            setCaptureState('ready');
         }
     };
 
-    const selectFile = (nextFile: File | undefined) => {
-        setFile(nextFile ?? null);
-        setResult(null);
-        setError('');
-    };
-
-    return <section className="public-content meeting-content">
-        <section className="meeting-intro">
-            <p className="eyebrow">Meeting Intelligence</p>
-            <h2>Transcribe a recording with explicit consent.</h2>
-            <p className="muted">Public beta supports one uploaded recording at a time. It does not create a meeting history or enable desktop capture, system control, speaker biometrics, or private commands.</p>
-        </section>
-        <form className="meeting-form provider-card" onSubmit={upload}>
+    return <section className="public-content meeting-workspace public-meeting-workspace">
+        <header className="meeting-hero">
+            <div><span className="meeting-eyebrow">Meeting intelligence</span><h2>Listen quietly. Remember precisely.</h2><p>Live microphone capture with explicit consent. No file picker, meeting history, speaker biometrics, desktop capture, or private commands are included in the public beta.</p></div>
+            <div className={`worker-pill ${captureState === 'recording' ? 'connected' : 'idle'}`}><span className="worker-dot" />{captureState === 'recording' ? 'Microphone recording' : captureState === 'processing' ? 'Preparing transcript' : 'Ready for a meeting'}</div>
+        </header>
+        <div className="meeting-launch-grid">
+        <article className="meeting-card launch-card">
+            <div className="card-heading"><Mic2 size={19} /><div><h3>Live meeting</h3><p>Capture begins only after you explicitly start it.</p></div></div>
             <div className="mode-choice">
                 <button type="button" className={mode === 'hosted' ? 'selected' : ''} aria-pressed={mode === 'hosted'} onClick={() => setMode('hosted')}>Saksham Hosted</button>
                 <button type="button" className={mode === 'byok' ? 'selected' : ''} aria-pressed={mode === 'byok'} onClick={() => setMode('byok')}>Use my API key</button>
             </div>
-            <label className="file-field">Recording<input type="file" accept={mode === 'hosted' ? 'audio/wav,.wav' : 'audio/*,.flac,.m4a,.mp3,.mp4,.mpeg,.mpga,.ogg,.wav,.webm'} onChange={event => selectFile(event.target.files?.[0])} /></label>
-            {file && <p className="file-name">Selected: {file.name} ({Math.ceil(file.size / 1024 / 1024)} MB)</p>}
-            {mode === 'hosted' ? <p className="muted">Hosted transcription accepts a mono PCM16 WAV recording up to 15 minutes and has a daily beta limit. Audio is processed by the private worker and is not retained as public chat history.</p> : <div className="byok-fields"><input aria-label="Transcription provider URL" value={providerUrl} onChange={event => setProviderUrl(event.target.value)} /><input aria-label="Transcription provider API key" type="password" placeholder="Provider API key (session only)" value={providerKey} onChange={event => setProviderKey(event.target.value)} /><input aria-label="Transcription model" value={model} onChange={event => setModel(event.target.value)} /></div>}
+            {mode === 'hosted' ? <p className="muted">Hosted usage has one shared GPU slot and a daily beta limit. The browser produces a mono PCM16 WAV only when you stop; it is processed transiently and not saved as meeting history.</p> : <div className="byok-fields"><input aria-label="Transcription provider URL" value={providerUrl} onChange={event => setProviderUrl(event.target.value)} /><input aria-label="Transcription provider API key" type="password" placeholder="Provider API key (session only)" value={providerKey} onChange={event => setProviderKey(event.target.value)} /><input aria-label="Transcription model" value={model} onChange={event => setModel(event.target.value)} /></div>}
             {mode === 'byok' && <p className="muted">Your key is sent only with this request and is never stored. The initial adapter supports allowlisted OpenAI-compatible transcription providers.</p>}
-            <label className="consent-check"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /> <span>I confirm every participant has agreed to this recording being uploaded and transcribed.</span></label>
-            <button disabled={busy || !file || !consent}>{busy ? 'Transcribing…' : 'Transcribe recording'}</button>
-            {error && <p className="notice">{error}</p>}
-        </form>
-        {result && <section className="transcript-card" aria-live="polite">
-            <div className="transcript-heading"><div><p className="eyebrow">Transcript</p><h3>{result.model ?? 'Transcription complete'}</h3></div>{result.language && <span>{result.language}</span>}</div>
-            {segments.length > 0 ? <div className="transcript-list">{segments.map(segment => <article key={segment.id}><time>{formatTime(segment.start)}</time><p>{segment.text}</p></article>)}</div> : <p className="transcript-text">{result.text || 'The transcription provider returned no readable text.'}</p>}
-        </section>}
+            <label className="consent-check"><input type="checkbox" checked={consent} disabled={captureState !== 'ready'} onChange={event => setConsent(event.target.checked)} /> <span>I confirm every participant has agreed to this live recording and transcription. Audio is kept in browser memory during capture and discarded after processing.</span></label>
+            {captureState === 'ready' ? <button className="record-button" type="button" onClick={() => void startRecording()} disabled={!consent}><Mic2 size={18} /> Start recording</button> : <p className="file-preview">Microphone permission is active. Closing this page or pressing Stop ends capture and clears in-memory audio.</p>}
+        </article>
+        <article className="meeting-card trust-card"><div className="card-heading"><ShieldCheck size={19} /><div><h3>Privacy boundary</h3><p>Public beta keeps the desktop-only controls out of this workspace.</p></div></div><div className="profile-missing"><p>There is no file upload control and no recording library. Saksham cannot control your system or save reusable voice profiles here.</p><div className="enrollment-prompt"><span>Before you start</span>Everyone being recorded must know and agree.</div></div></article>
+        </div>
+        {(error || captureState !== 'ready') && <div className={`meeting-alert ${error ? 'warning' : 'success'}`}>{error ? <FileText size={17} /> : <Radio size={17} />}<span>{error || (captureState === 'recording' ? 'Recording locally in this browser. Saksham remains silent.' : 'Microphone is off. Sending the final in-memory audio for transcription.')}</span>{error && <button onClick={() => setError('')}>Dismiss</button>}</div>}
+        {captureState !== 'ready' && <div className={`recording-strip ${captureState === 'processing' ? 'processing' : ''}`}><div className="recording-identity"><span className="recording-orbit"><span /></span><div><strong>Live meeting</strong><span>{captureState === 'recording' ? 'Recording continuously' : 'Finalizing the conversation'}</span></div></div><div className="recording-clock"><Clock3 size={18} /> {formatTime(elapsed)}</div>{captureState === 'recording' && <button className="stop-button" onClick={() => void stopRecording()}><Square size={15} fill="currentColor" /> Stop recording</button>}</div>}
+        {result && <section className="meeting-results" aria-live="polite"><div className="results-toolbar"><div><span className="state-badge completed">completed</span><h3>Live transcript</h3><p>{result.model ?? 'Transcription complete'}{result.language ? ` · ${result.language}` : ''}</p></div></div><article className="meeting-card final-transcript"><div className="card-heading"><Users size={18} /><div><h3>Transcript</h3><p>Generated after capture stops. Recording audio has been cleared from this browser.</p></div></div>{segments.length > 0 ? <div className="transcript-list">{segments.map(segment => <div className="transcript-row" key={segment.id}><span>{formatTime(segment.start)}</span><p>{segment.text}</p></div>)}</div> : <p className="transcript-text">{result.text || 'The transcription provider returned no readable text.'}</p>}</article></section>}
     </section>;
 }
 

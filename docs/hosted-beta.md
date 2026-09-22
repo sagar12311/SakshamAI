@@ -107,19 +107,23 @@ References: [Cloudflare Pages build settings](https://developers.cloudflare.com/
 ## Meeting Intelligence
 
 The public Meeting Intelligence screen is intentionally stateless: a signed-in
-user uploads one recording, explicitly confirms participant consent, receives a
-transcript, and the browser clears the selected file after completion. It does
-not expose the desktop Meeting API, live capture, projects, speaker profiles,
-diarization, or voice verification.
+user explicitly confirms participant consent, records from the browser
+microphone in real time, stops the recording, and receives a transcript. There
+is no file picker or recording library. Audio remains in browser memory while
+recording and is sent once to the gateway only after stop; it is then cleared
+from the browser. This is live capture, not streaming transcription. It does
+not expose the desktop Meeting API, projects, speaker profiles, diarization,
+voice verification, or private commands.
 
-- **Hosted mode** accepts only a valid mono PCM16 WAV file. The gateway limits
-  uploads to 25 MiB and 15 minutes by default, uses one shared hosted GPU job
+- **Hosted mode** receives a browser-produced mono PCM16 WAV after the user
+  stops capture. The gateway limits the final request to 25 MiB and 15 minutes
+  by default, uses one shared hosted GPU job
   at a time across Chat and Meetings, and enforces a per-user daily duration
   quota.
 - **BYOK mode** uses a session-only key with the allowlisted
   OpenAI-compatible `/audio/transcriptions` adapter. It does not consume the
-  hosted GPU quota, but the file still passes through the authenticated gateway
-  to reach the provider.
+  hosted GPU quota, but the final live-capture buffer still passes through the
+  authenticated gateway to reach the provider.
 - Audio travels browser → Cloudflare → Gateway → private worker/provider.
   The gateway does not retain it deliberately; the hosted worker uses a
   temporary file during processing. Document any additional retention imposed

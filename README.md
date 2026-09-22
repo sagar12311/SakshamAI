@@ -45,8 +45,8 @@ quota-limited inference gateway. It never exposes the maintainers' model,
 meeting-worker, or private-network endpoints. Hosted access is optional; this
 repository remains usable with your own local model endpoint.
 
-The browser beta supports authenticated Chat and consented Meeting Intelligence
-uploads. Users can choose Saksham-hosted capacity or an allowlisted,
+The browser beta supports authenticated Chat and consented live microphone
+capture for Meeting Intelligence. Users can choose Saksham-hosted capacity or an allowlisted,
 OpenAI-compatible API key for their own session. It intentionally does not
 include desktop capture, macOS automation, voice biometrics, or system control.
 
