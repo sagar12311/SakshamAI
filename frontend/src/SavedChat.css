@@ -27,7 +27,7 @@
 .sidebar-collapsed .saved-chat-heading { padding-left:28px; }.conversation-actions { display:flex; gap:3px; }.public-shell .conversation-actions button { background:transparent; color:var(--muted); font-size:.73rem; padding:5px 7px; }
 .saved-provider-bar { display:flex; gap:14px; margin-top:14px; }.saved-provider-bar label,.saved-chat-main .byok-fields label { display:grid; gap:5px; font-size:.72rem; color:var(--muted); min-width:0; }.public-shell .saved-provider-bar select { padding:6px 9px; font-size:.8rem; max-width:240px; }
 .saved-privacy,.context-note { color:var(--muted); font-size:.72rem; line-height:1.4; margin:10px 0; }.context-note { color:#bac7ff; }
-.saved-messages { flex:1; min-height:0; overflow-y:auto; overflow-wrap:anywhere; padding:28px max(12px,calc((100% - 780px)/2)) 36px; scrollbar-gutter:stable; }
+.saved-messages { flex:1; min-height:0; overflow-y:auto; overflow-wrap:anywhere; padding:28px 16px 36px; scrollbar-gutter:stable; }
 .saved-messages .empty-chat { min-height:100%; }
 .saved-turn { display:flex; flex-direction:column; gap:28px; padding:0; margin:0 0 44px; }
 .saved-turn article { min-width:0; margin:0; padding:0; }
@@ -38,7 +38,7 @@
 .saved-turn article:not(.saved-user) { align-self:stretch; padding:0 4px; }
 .saved-turn > .failed-turn,.saved-turn > .muted { margin:0; line-height:1.6; }
 .failed-turn { color:#f1b5b5; font-size:.8rem; }.public-shell .failed-turn button { margin-left:10px; font-size:.75rem; }
-.saved-chat-main .composer { flex-shrink:0; width:100%; max-width:820px; box-sizing:border-box; align-self:center; margin:16px 0 0; padding:8px; background:#1c1d22; border-color:var(--line-strong); border-radius:12px; gap:12px; }
+.saved-chat-main .composer { flex-shrink:0; width:100%; box-sizing:border-box; align-self:stretch; margin:16px 0 0; padding:8px; background:#1c1d22; border-color:var(--line-strong); border-radius:12px; gap:12px; }
 .saved-chat-main .composer input { padding:12px; font-size:.94rem; }
 .saved-chat-main .notice { font-size:.8rem; }.pending-message { padding:8px; font-size:.8rem; }.pending-message button { margin-right:8px; }
 @media(max-width:760px) { .saved-messages { padding:20px 4px 28px; }.saved-turn { gap:24px; margin-bottom:36px; }.saved-turn .saved-user { max-width:90%; padding:14px 16px; }.saved-turn article > p { font-size:.9rem; line-height:1.75; }.saved-chat-main .composer { gap:6px; padding:5px; } }
