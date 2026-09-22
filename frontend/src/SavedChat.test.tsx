@@ -45,7 +45,7 @@ describe('saved conversations', () => {
         expect(screen.getByText('Meeting content')).toBeVisible();
         expect(screen.queryByRole('textbox', { name: 'Message' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Meeting Intelligence' })).toHaveAttribute('aria-current', 'page');
-        fireEvent.click(screen.getByRole('button', { name: 'Chat', exact: true }));
+        fireEvent.click(screen.getByRole('button', { name: /^Chat$/ }));
         expect(change).toHaveBeenCalledWith('chat');
         await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     });
