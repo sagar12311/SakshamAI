@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient, type Session } from '@supabase/supabase-js';
 import { Clock3, FileText, Mic2, Radio, ShieldCheck, Square, Users } from 'lucide-react';
-import './PublicApp.css';
 import './components/Meeting/MeetingWorkspace.css';
+import './PublicApp.css';
 
 type Message = { role: 'user' | 'assistant'; content: string };
 type Mode = 'hosted' | 'byok';
@@ -90,7 +90,8 @@ function AuthScreen({ onSession }: { onSession: (session: Session) => void }) {
 
     return <main className="public-shell auth-shell">
         <section className="auth-card">
-            <p className="eyebrow">Saksham Public Beta</p>
+            <div className="auth-brand"><span className="brand-mark" aria-hidden="true">S</span><span>Saksham</span><span className="beta-badge">Beta</span></div>
+            <p className="eyebrow">Your private workspace</p>
             <h1>{signup ? 'Create your account' : 'Welcome back'}</h1>
             <p className="muted">Hosted requests are processed on Saksham-operated infrastructure. You can also use your own supported provider key for one session.</p>
             <form onSubmit={submit}>
@@ -148,15 +149,16 @@ function PublicChat({ session }: { session: Session }) {
         }
     };
 
-    return <section className="public-content">
+    return <section className="public-content chat-content">
         <section className="provider-card">
+            <div className="section-heading"><div><p className="eyebrow">Assistant</p><h2>New conversation</h2></div><span className="session-status"><span />Private session</span></div>
             <div className="mode-choice">
                 <button className={mode === 'hosted' ? 'selected' : ''} aria-pressed={mode === 'hosted'} onClick={() => setMode('hosted')}>Saksham Hosted</button>
                 <button className={mode === 'byok' ? 'selected' : ''} aria-pressed={mode === 'byok'} onClick={() => setMode('byok')}>Use my API key</button>
             </div>
             {mode === 'hosted' ? <p className="muted">Hosted usage is limited to protect beta capacity. Prompts are processed transiently and are not saved as chat history.</p> : <div className="byok-fields"><input aria-label="Provider URL" value={providerUrl} onChange={event => setProviderUrl(event.target.value)} /><input aria-label="Provider API key" type="password" placeholder="Provider API key (session only)" value={providerKey} onChange={event => setProviderKey(event.target.value)} /><input aria-label="Model" placeholder="Model (optional)" value={model} onChange={event => setModel(event.target.value)} /></div>}
         </section>
-        <section className="messages" aria-live="polite">{messages.length === 0 ? <p className="muted">Ask Saksham anything. Desktop automation is not available in the public beta.</p> : messages.map((message, index) => <article className={message.role} key={`${message.role}-${index}`}><strong>{message.role === 'assistant' ? 'Saksham' : 'You'}</strong><p>{message.content}</p></article>)}</section>
+        <section className="messages" aria-live="polite">{messages.length === 0 ? <div className="empty-chat"><span className="brand-mark" aria-hidden="true">S</span><div><h3>How can I help?</h3><p className="muted">Start a conversation with Saksham. Desktop automation is not included in this public beta.</p></div></div> : messages.map((message, index) => <article className={message.role} key={`${message.role}-${index}`}><strong>{message.role === 'assistant' ? 'Saksham' : 'You'}</strong><p>{message.content}</p></article>)}</section>
         <form className="composer" onSubmit={send}><input value={input} onChange={event => setInput(event.target.value)} placeholder="Ask Saksham…" disabled={busy} /><button disabled={busy}>{busy ? 'Thinking…' : 'Send'}</button></form>
         {error && <p className="notice">{error}</p>}
     </section>;
@@ -305,8 +307,8 @@ export function PublicMeetings({ session, gateway = gatewayUrl }: { session: Ses
 
 function PublicHeader({ workspace, setWorkspace }: { workspace: Workspace; setWorkspace: (workspace: Workspace) => void }) {
     return <header className="public-header">
-        <div><p className="eyebrow">Saksham Public Beta</p><h1>Private by default, powerful by choice.</h1></div>
-        <div className="header-actions"><nav aria-label="Public beta workspaces"><button className={workspace === 'chat' ? 'selected' : ''} onClick={() => setWorkspace('chat')}>Chat</button><button className={workspace === 'meetings' ? 'selected' : ''} onClick={() => setWorkspace('meetings')}>Meeting Intelligence</button></nav><button className="link-button" onClick={() => void supabase?.auth.signOut()}>Sign out</button></div>
+        <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">S</span><span>Saksham</span><span className="beta-badge">Beta</span></div>
+        <div className="header-actions"><nav aria-label="Public beta workspaces"><button className={workspace === 'chat' ? 'selected' : ''} onClick={() => setWorkspace('chat')}>Chat</button><button className={workspace === 'meetings' ? 'selected' : ''} onClick={() => setWorkspace('meetings')}>Meeting Intelligence</button></nav><span className="header-divider" /><button className="link-button" onClick={() => void supabase?.auth.signOut()}>Sign out</button></div>
     </header>;
 }
 
