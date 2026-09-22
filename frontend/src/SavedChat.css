@@ -1,4 +1,14 @@
-.saved-workspace { position:relative; display:grid; grid-template-columns:250px minmax(0,1fr); height:calc(100dvh - 120px); min-height:480px; margin-top:16px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--surface); }
+.saved-workspace { position:relative; display:grid; grid-template-columns:250px minmax(0,1fr); flex:1; min-height:0; overflow:hidden; background:var(--surface); }
+.public-shell.workspace-shell { display:flex; flex-direction:column; height:100dvh; min-height:0; padding:0; overflow:hidden; }
+.workspace-shell .public-header { flex:none; flex-direction:row; align-items:center; padding:10px 20px; min-height:38px; }
+.workspace-shell .header-actions { width:auto; }
+.public-shell .workspace-navigation { display:grid; gap:4px; margin-bottom:16px; }
+.public-shell .workspace-navigation button { text-align:left; background:transparent; color:var(--muted); }
+.public-shell .workspace-navigation button[aria-current="page"] { background:#222a44; color:var(--text); }
+.saved-chat-main[hidden] { display:none; }
+.saved-meeting-main { min-width:0; min-height:0; overflow-y:auto; padding:24px; }
+.saved-meeting-main .public-meeting-workspace { margin-top:0; }
+.sidebar-collapsed .saved-meeting-main { padding-left:48px; }
 .saved-workspace.sidebar-collapsed { grid-template-columns:minmax(0,1fr); }
 .sidebar-collapsed .chat-sidebar { display:none; }
 .public-shell .sidebar-toggle { position:absolute; top:14px; left:12px; z-index:2; padding:5px; background:transparent; color:var(--muted); }
@@ -23,4 +33,6 @@
 .saved-chat-main .composer { flex-shrink:0; margin-top:10px; }.saved-chat-main .notice { font-size:.8rem; }.pending-message { padding:8px; font-size:.8rem; }.pending-message button { margin-right:8px; }
 .chat-dialog { color:var(--text); background:var(--surface); border:1px solid var(--line); border-radius:10px; width:min(440px,calc(100vw - 40px)); padding:24px; box-sizing:border-box; }.chat-dialog::backdrop { background:#0009; }.chat-dialog h2 { font-size:1.15rem; }.chat-dialog label { display:grid; gap:8px; }.chat-dialog form > div { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
 .sidebar-scrim,.mobile-close { display:none; }
+.public-shell .saved-workspace { height:auto; min-height:0; }
+@media(max-width:760px) { .saved-meeting-main { width:100%; padding:48px 14px 14px; box-sizing:border-box; }.sidebar-collapsed .saved-meeting-main { padding-left:14px; } }
 @media(max-width:760px) { .saved-workspace,.saved-workspace.sidebar-collapsed { display:flex; height:calc(100dvh - 168px); min-height:420px; }.saved-chat-main { width:100%; padding:14px; }.saved-chat-heading { padding-left:30px; flex-wrap:wrap; }.saved-chat-heading h2 { max-width:100%; }.chat-sidebar,.sidebar-collapsed .chat-sidebar { display:none; }.chat-sidebar.mobile-open { display:block; position:absolute; z-index:5; top:0; bottom:0; left:0; width:min(280px,85%); box-sizing:border-box; }.public-shell .sidebar-scrim { display:block; position:absolute; inset:0; z-index:4; background:#0009; border-radius:0; }.public-shell .mobile-close { display:block; background:transparent; padding:0; }.saved-provider-bar { flex-wrap:wrap; gap:8px; }.public-shell .saved-provider-bar select { max-width:180px; }.saved-chat-main .byok-fields { grid-template-columns:1fr; }.saved-chat-main .composer { flex-direction:row; }.saved-chat-main .composer button { width:auto; }.saved-privacy { font-size:.68rem; } }

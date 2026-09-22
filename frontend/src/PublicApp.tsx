@@ -249,10 +249,10 @@ export function PublicMeetings({ session, gateway = gatewayUrl }: { session: Ses
     </section>;
 }
 
-function PublicHeader({ workspace, setWorkspace }: { workspace: Workspace; setWorkspace: (workspace: Workspace) => void }) {
+function PublicHeader() {
     return <header className="public-header">
         <div className="brand-lockup"><img className="brand-mark" src="/saksham-mark.svg" alt="" /><span>Saksham</span><span className="beta-badge">Beta</span></div>
-        <div className="header-actions"><nav aria-label="Public beta workspaces"><button className={workspace === 'chat' ? 'selected' : ''} onClick={() => setWorkspace('chat')}>Chat</button><button className={workspace === 'meetings' ? 'selected' : ''} onClick={() => setWorkspace('meetings')}>Meeting Intelligence</button></nav><span className="header-divider" /><button className="link-button" onClick={() => void supabase?.auth.signOut()}>Sign out</button></div>
+        <div className="header-actions"><button className="link-button" onClick={() => void supabase?.auth.signOut()}>Sign out</button></div>
     </header>;
 }
 
@@ -268,5 +268,5 @@ export default function PublicApp() {
     }, []);
     if (!configured) return <main className="public-shell auth-shell"><section className="auth-card"><h1>Public beta is not configured</h1><p className="muted">Set the Supabase and gateway variables in the deployment environment.</p></section></main>;
     if (!session) return <AuthScreen onSession={setSession} />;
-    return <main className="public-shell workspace-shell"><PublicHeader workspace={workspace} setWorkspace={setWorkspace} /><div hidden={workspace !== 'chat'}><SavedChat key={session.user.id} session={session} gateway={gatewayUrl!} /></div>{workspace === 'meetings' && <PublicMeetings session={session} />}</main>;
+    return <main className="public-shell workspace-shell"><PublicHeader /><SavedChat key={session.user.id} session={session} gateway={gatewayUrl!} workspace={workspace} onWorkspaceChange={setWorkspace}>{workspace === 'meetings' && <PublicMeetings session={session} />}</SavedChat></main>;
 }

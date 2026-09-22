@@ -18,6 +18,8 @@ describe('saved conversations', () => {
         expect(screen.getByLabelText('API key · session only')).toHaveValue('');
         expect(screen.getByText(/latest 14 completed exchanges/)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Unpin' })).toBeEnabled();
+        expect(screen.queryByLabelText('Chat project')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Chat provider')).toBeInTheDocument();
     });
 
     it('reuses the request and conversation IDs after a lost connection', async () => {
@@ -34,5 +36,17 @@ describe('saved conversations', () => {
         expect(attempts[0].url).toBe(attempts[1].url);
         expect(attempts[0].body.request_id).toBe(attempts[1].body.request_id);
         expect(attempts[1].body.content).toBe('Hello');
+    });
+
+    it('keeps workspace navigation available on the meetings page', async () => {
+        vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith('/projects') ? [] : { items: [], next_offset: null } })));
+        const change = vi.fn();
+        render(<SavedChat session={session} gateway="https://gateway.test" workspace="meetings" onWorkspaceChange={change}><h2>Meeting content</h2></SavedChat>);
+        expect(screen.getByText('Meeting content')).toBeVisible();
+        expect(screen.queryByRole('textbox', { name: 'Message' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Meeting Intelligence' })).toHaveAttribute('aria-current', 'page');
+        fireEvent.click(screen.getByRole('button', { name: 'Chat', exact: true }));
+        expect(change).toHaveBeenCalledWith('chat');
+        await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     });
 });

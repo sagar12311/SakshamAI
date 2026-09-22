@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { Menu, Plus, Pin, Folder, MessageSquare, X } from 'lucide-react';
 import './SavedChat.css';
@@ -9,7 +9,7 @@ type Turn = { id: number; request_id: string; user_content: string; assistant_co
 type Detail = { conversation: Conversation; turns: Turn[]; next_before: number | null; context_limited: boolean };
 type Pending = { conversation: string; request: string; text: string };
 
-export default function SavedChat({ session, gateway }: { session: Session; gateway: string }) {
+export default function SavedChat({ session, gateway, workspace = 'chat', onWorkspaceChange, children }: { session: Session; gateway: string; workspace?: 'chat' | 'meetings'; onWorkspaceChange?: (workspace: 'chat' | 'meetings') => void; children?: ReactNode }) {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [active, setActive] = useState<string | null>(null);
@@ -63,11 +63,12 @@ export default function SavedChat({ session, gateway }: { session: Session; gate
     }, [api]);
 
     const open = useCallback(async (id: string) => {
+        onWorkspaceChange?.('chat');
         current.current = id; setActive(id); setDetail(null); setKey(''); setInput(''); setError(''); setLoading(true); setSidebar(false);
         sessionStorage.setItem(`saksham.active.${session.user.id}`, id);
         try { await load(id); } catch (e) { if (current.current === id) setError((e as Error).message); }
         finally { if (alive.current && current.current === id) setLoading(false); }
-    }, [load, session.user.id]);
+    }, [load, session.user.id, onWorkspaceChange]);
 
     useEffect(() => {
         void refresh().catch(e => alive.current && setError(e.message));
@@ -83,6 +84,7 @@ export default function SavedChat({ session, gateway }: { session: Session; gate
     }, [active, detail, busy, load]);
 
     const newChat = (projectId = '') => {
+        onWorkspaceChange?.('chat');
         current.current = null; setActive(null); setDetail(null); setInput(''); setKey(''); setMode('hosted'); setModel(''); setProvider('https://api.openai.com/v1'); setProject(projectId); setError(''); setSidebar(false);
         sessionStorage.removeItem(`saksham.active.${session.user.id}`);
     };
@@ -134,6 +136,7 @@ export default function SavedChat({ session, gateway }: { session: Session; gate
         {sidebar && <button className="sidebar-scrim" aria-label="Close chat sidebar" onClick={() => setSidebar(false)} />}
         <aside className={`chat-sidebar ${sidebar ? 'mobile-open' : ''}`} aria-label="Chat navigation">
             <div className="sidebar-top"><strong>Workspace</strong><button className="mobile-close" aria-label="Close chat sidebar" onClick={() => setSidebar(false)}><X size={16} /></button></div>
+            <nav className="workspace-navigation" aria-label="Public beta workspaces"><button aria-current={workspace === 'chat' ? 'page' : undefined} onClick={() => { onWorkspaceChange?.('chat'); setSidebar(false); }}>Chat</button><button aria-current={workspace === 'meetings' ? 'page' : undefined} onClick={() => { onWorkspaceChange?.('meetings'); setSidebar(false); }}>Meeting Intelligence</button></nav>
             <button className="new-chat" disabled={busy || Boolean(pending)} onClick={() => newChat()}><Plus size={16} />New chat</button>
             <h3><Pin size={13} />Pinned</h3>{conversations.filter(c => c.pinned).map(row)}{!conversations.some(c => c.pinned) && <p className="sidebar-empty">Pin a conversation to keep it here.</p>}
             <div className="sidebar-section-heading"><h3><Folder size={13} />Projects</h3><button aria-label="Create project" onClick={() => setDialog({ kind: 'project-create', value: '' })}><Plus size={14} /></button></div>
@@ -142,9 +145,9 @@ export default function SavedChat({ session, gateway }: { session: Session; gate
             <h3>Recents</h3>{conversations.map(row)}{!conversations.length && <p className="sidebar-empty">Your saved chats will appear here.</p>}
             <button className="history-refresh" onClick={() => { void refresh().then(() => active ? load(active) : undefined).catch(e => setError(e.message)); }}>Reload history</button>
         </aside>
-        <section className="saved-chat-main" aria-label="Conversation">
+        <section className="saved-chat-main" aria-label="Conversation" hidden={workspace !== 'chat'}>
             <header className="saved-chat-heading"><h2>{detail?.conversation.title || 'New conversation'}</h2>{detail && <div className="conversation-actions"><button disabled={generating} onClick={() => void patchChat({ pinned: !detail.conversation.pinned })}>{detail.conversation.pinned ? 'Unpin' : 'Pin'}</button><button disabled={generating} onClick={() => setDialog({ kind: 'chat-rename', id: active!, value: detail.conversation.title })}>Rename</button><button disabled={generating} onClick={() => setDialog({ kind: 'chat-delete', id: active!, value: detail.conversation.title })}>Delete</button></div>}</header>
-            <div className="saved-provider-bar"><label>Provider<select aria-label="Chat provider" disabled={generating || loading} value={mode} onChange={e => setMode(e.target.value as 'hosted' | 'byok')}><option value="hosted">Saksham Hosted</option><option value="byok">Use my API key</option></select></label><label>Project<select aria-label="Chat project" disabled={generating || loading} value={project} onChange={e => { setProject(e.target.value); if (active && detail) void patchChat({ project_id: e.target.value || null }); }}><option value="">No project</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label></div>
+            <div className="saved-provider-bar"><label>Provider<select aria-label="Chat provider" disabled={generating || loading} value={mode} onChange={e => setMode(e.target.value as 'hosted' | 'byok')}><option value="hosted">Saksham Hosted</option><option value="byok">Use my API key</option></select></label></div>
             {mode === 'byok' && <div className="byok-fields"><label>Provider URL<input value={provider} onChange={e => setProvider(e.target.value)} disabled={generating} /></label><label>API key · session only<input type="password" autoComplete="off" value={key} onChange={e => setKey(e.target.value)} disabled={generating} /></label><label>Model<input value={model} onChange={e => setModel(e.target.value)} disabled={generating} /></label></div>}
             <p className="saved-privacy">Chats are saved to your account until you delete them. Provider API keys are never saved.</p>
             {detail?.context_limited && <p className="context-note">Only the latest 14 completed exchanges are included in new replies. Your full history remains saved.</p>}
@@ -160,6 +163,7 @@ export default function SavedChat({ session, gateway }: { session: Session; gate
             {pending && !busy && <div className="pending-message"><p>Delivery needs checking: “{pending.text.slice(0,100)}”</p><button onClick={() => void send(pending)}>Retry same message</button><button onClick={() => { setPending(null); setError(''); }}>Keep draft</button></div>}
             <form className="composer" onSubmit={e => { e.preventDefault(); void send(); }}><input aria-label="Message" maxLength={12000} value={input} onChange={e => setInput(e.target.value)} placeholder="Message Saksham…" disabled={generating || loading || Boolean(pending)} /><button disabled={generating || loading || Boolean(pending) || !input.trim()}>Send</button></form>
         </section>
+        {workspace === 'meetings' && <div className="saved-meeting-main">{children}</div>}
         {dialog && <dialog ref={dialogRef} className="chat-dialog" onCancel={() => setDialog(null)}><form onSubmit={submitDialog}><h2>{dialog.kind.endsWith('delete') ? 'Confirm deletion' : dialog.kind === 'project-create' ? 'Create project' : 'Rename'}</h2>{dialog.kind.endsWith('delete') ? <p>{dialog.kind === 'project-delete' ? `Delete “${dialog.value}”? Its chats will be kept outside the project.` : `Permanently delete “${dialog.value}” and its messages?`}</p> : <label>Name<input autoFocus required maxLength={dialog.kind === 'chat-rename' ? 160 : 100} value={dialog.value} onChange={e => setDialog({ ...dialog, value: e.target.value })} /></label>}<div><button type="button" onClick={() => setDialog(null)}>Cancel</button><button disabled={!dialog.value.trim()}>{dialog.kind.endsWith('delete') ? 'Delete' : 'Save'}</button></div></form></dialog>}
     </section>;
 }
