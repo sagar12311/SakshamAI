@@ -329,7 +329,7 @@ async def chat(request: ChatRequest, user: User = Depends(get_user), byok_key: s
             quota_reserved = True
         base_url, api_key, model = select_provider(request, byok_key)
         async with httpx.AsyncClient(timeout=httpx.Timeout(120, connect=10)) as client:
-            response = await client.post(f"{base_url}/chat/completions", headers={"Authorization": f"Bearer {api_key}"},
+            response = await client.post(f"{base_url}/chat/completions", headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
                 json={"model": model, "messages": [message.model_dump() for message in request.messages], "max_tokens": maximum})
         if response.status_code >= 400:
             raise HTTPException(502, "Inference provider rejected the request")
