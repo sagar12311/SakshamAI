@@ -21,6 +21,15 @@ export default defineConfig(({ mode }) => {
         catch { throw new Error('Use a Supabase publishable key or legacy anon key in the public build'); }
         if (role !== 'anon') throw new Error('A privileged Supabase key must never enter the public build');
     }
+    const supabaseOrigin = new URL(env.VITE_SUPABASE_URL!).origin;
+    const gatewayOrigin = new URL(env.VITE_SAKSHAM_GATEWAY_URL!).origin;
+    const headers = `/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${supabaseOrigin} ${gatewayOrigin}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'
+`;
     return {
         plugins: [react(), {
             name: 'public-only-entry',
@@ -32,7 +41,18 @@ export default defineConfig(({ mode }) => {
                     .replace('Your Personal Jarvis - Cognitive Intelligence System', 'Saksham public beta — chat and meeting transcription'),
             },
         }],
+        build: {
+            outDir: 'dist-public',
+            sourcemap: false,
+            rollupOptions: {
+                plugins: [{
+                    name: 'public-security-headers',
+                    generateBundle() {
+                        this.emitFile({ type: 'asset', fileName: '_headers', source: headers });
+                    },
+                }],
+            },
+        },
         publicDir: 'public-beta',
-        build: { outDir: 'dist-public', sourcemap: false },
     };
 });
