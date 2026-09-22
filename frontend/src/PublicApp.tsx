@@ -90,7 +90,7 @@ function AuthScreen({ onSession }: { onSession: (session: Session) => void }) {
 
     return <main className="public-shell auth-shell">
         <section className="auth-card">
-            <div className="auth-brand"><span className="brand-mark" aria-hidden="true">S</span><span>Saksham</span><span className="beta-badge">Beta</span></div>
+            <div className="auth-brand"><img className="brand-mark" src="/saksham-mark.svg" alt="" /><span>Saksham</span><span className="beta-badge">Beta</span></div>
             <p className="eyebrow">Your private workspace</p>
             <h1>{signup ? 'Create your account' : 'Welcome back'}</h1>
             <p className="muted">Hosted requests are processed on Saksham-operated infrastructure. You can also use your own supported provider key for one session.</p>
@@ -158,7 +158,7 @@ function PublicChat({ session }: { session: Session }) {
             </div>
             {mode === 'hosted' ? <p className="muted">Hosted use is available to approved beta accounts. Prompts are processed transiently and are not saved as chat history.</p> : <div className="byok-fields"><input aria-label="Provider URL" value={providerUrl} onChange={event => setProviderUrl(event.target.value)} /><input aria-label="Provider API key" type="password" placeholder="Provider API key (session only)" value={providerKey} onChange={event => setProviderKey(event.target.value)} /><input aria-label="Model" placeholder="Model (optional)" value={model} onChange={event => setModel(event.target.value)} /></div>}
         </section>
-        <section className="messages" aria-live="polite">{messages.length === 0 ? <div className="empty-chat"><span className="brand-mark" aria-hidden="true">S</span><div><h3>How can I help?</h3><p className="muted">Start a conversation with Saksham. Desktop automation is not included in this public beta.</p></div></div> : messages.map((message, index) => <article className={message.role} key={`${message.role}-${index}`}><strong>{message.role === 'assistant' ? 'Saksham' : 'You'}</strong><p>{message.content}</p></article>)}</section>
+        <section className="messages" aria-live="polite">{messages.length === 0 ? <div className="empty-chat"><img className="brand-mark" src="/saksham-mark.svg" alt="" /><div><h3>How can I help?</h3><p className="muted">Start a conversation with Saksham. Desktop automation is not included in this public beta.</p></div></div> : messages.map((message, index) => <article className={message.role} key={`${message.role}-${index}`}><strong>{message.role === 'assistant' ? 'Saksham' : 'You'}</strong><p>{message.content}</p></article>)}</section>
         <form className="composer" onSubmit={send}><input value={input} onChange={event => setInput(event.target.value)} placeholder="Ask Saksham…" disabled={busy} /><button disabled={busy}>{busy ? 'Thinking…' : 'Send'}</button></form>
         {error && <p className="notice">{error}</p>}
     </section>;
@@ -294,7 +294,7 @@ export function PublicMeetings({ session, gateway = gatewayUrl }: { session: Ses
             </div>
             {mode === 'hosted' ? <p className="muted">Hosted use shares one GPU job at a time. The browser produces a mono PCM16 WAV only when you stop; it is processed transiently and not saved as meeting history.</p> : <div className="byok-fields"><input aria-label="Transcription provider URL" value={providerUrl} onChange={event => setProviderUrl(event.target.value)} /><input aria-label="Transcription provider API key" type="password" placeholder="Provider API key (session only)" value={providerKey} onChange={event => setProviderKey(event.target.value)} /><input aria-label="Transcription model" value={model} onChange={event => setModel(event.target.value)} /></div>}
             {mode === 'byok' && <p className="muted">Your key is sent only with this request and is never stored. The initial adapter supports allowlisted OpenAI-compatible transcription providers.</p>}
-            <label className="consent-check"><input type="checkbox" checked={consent} disabled={captureState !== 'ready'} onChange={event => setConsent(event.target.checked)} /> <span>I confirm every participant has agreed to this live recording and transcription. Audio is kept in browser memory during capture and discarded after processing.</span></label>
+            <label className="consent-check"><input type="checkbox" aria-label="I confirm everyone has agreed to be recorded and transcribed." checked={consent} disabled={captureState !== 'ready'} onChange={event => setConsent(event.target.checked)} /><span><strong>I confirm everyone has agreed to be recorded and transcribed.</strong><small>Audio stays in browser memory until processing completes, then is discarded.</small></span></label>
             {captureState === 'ready' ? <button className="record-button" type="button" onClick={() => void startRecording()} disabled={!consent}><Mic2 size={18} /> Start recording</button> : <p className="file-preview">Microphone permission is active. Closing this page or pressing Stop ends capture and clears in-memory audio.</p>}
         </article>
         <article className="meeting-card trust-card"><div className="card-heading"><ShieldCheck size={19} /><div><h3>Privacy boundary</h3><p>Public beta keeps the desktop-only controls out of this workspace.</p></div></div><div className="profile-missing"><p>There is no file upload control and no recording library. Saksham cannot control your system or save reusable voice profiles here.</p><div className="enrollment-prompt"><span>Before you start</span>Everyone being recorded must know and agree.</div></div></article>
@@ -307,7 +307,7 @@ export function PublicMeetings({ session, gateway = gatewayUrl }: { session: Ses
 
 function PublicHeader({ workspace, setWorkspace }: { workspace: Workspace; setWorkspace: (workspace: Workspace) => void }) {
     return <header className="public-header">
-        <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">S</span><span>Saksham</span><span className="beta-badge">Beta</span></div>
+        <div className="brand-lockup"><img className="brand-mark" src="/saksham-mark.svg" alt="" /><span>Saksham</span><span className="beta-badge">Beta</span></div>
         <div className="header-actions"><nav aria-label="Public beta workspaces"><button className={workspace === 'chat' ? 'selected' : ''} onClick={() => setWorkspace('chat')}>Chat</button><button className={workspace === 'meetings' ? 'selected' : ''} onClick={() => setWorkspace('meetings')}>Meeting Intelligence</button></nav><span className="header-divider" /><button className="link-button" onClick={() => void supabase?.auth.signOut()}>Sign out</button></div>
     </header>;
 }

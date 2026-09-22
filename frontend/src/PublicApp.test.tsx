@@ -10,6 +10,8 @@ describe('PublicMeetings', () => {
 
     it('requires consent before live microphone capture', () => {
         render(<PublicMeetings session={session} gateway="https://gateway.test" />);
+        expect(screen.getByRole('checkbox', { name: 'I confirm everyone has agreed to be recorded and transcribed.' })).toBeInTheDocument();
+        expect(screen.getByText('Audio stays in browser memory until processing completes, then is discarded.')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Start recording' })).toBeDisabled();
         expect(screen.queryByLabelText('Recording')).not.toBeInTheDocument();
     });
