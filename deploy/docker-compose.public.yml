@@ -17,6 +17,8 @@ services:
       HOSTED_ENABLED: ${HOSTED_ENABLED:-false}
       BETA_INVITE_ONLY: ${BETA_INVITE_ONLY:-true}
       BETA_USER_IDS: ${BETA_USER_IDS:-[]}
+      # These specific invited UUIDs bypass daily quotas; concurrency and request-size guards remain active.
+      UNLIMITED_USER_IDS: ${UNLIMITED_USER_IDS:-[]}
       DAILY_TOKEN_LIMIT: ${DAILY_TOKEN_LIMIT:-10000}
       DAILY_GLOBAL_TOKEN_LIMIT: ${DAILY_GLOBAL_TOKEN_LIMIT:-50000}
       MAX_OUTPUT_TOKENS: ${MAX_OUTPUT_TOKENS:-1024}

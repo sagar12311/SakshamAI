@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     hosted_enabled: bool = False
     beta_invite_only: bool = True
     beta_user_ids: list[str] = []
+    unlimited_user_ids: list[str] = []
 
     @property
     def jwks_url(self) -> str:
@@ -84,12 +85,16 @@ class User(BaseModel):
 class QuotaStore:
     aggregate_user_id = "__saksham_public_aggregate__"
 
-    def __init__(self, pool: asyncpg.Pool, limit: int, global_limit: int, meeting_minutes: int, global_meeting_minutes: int):
+    def __init__(self, pool: asyncpg.Pool, limit: int, global_limit: int, meeting_minutes: int, global_meeting_minutes: int, unlimited_user_ids: list[str] | None = None):
         self.pool = pool
         self.limit = limit
         self.global_limit = global_limit
         self.meeting_minutes = meeting_minutes
         self.global_meeting_minutes = global_meeting_minutes
+        self.unlimited_user_ids = set(unlimited_user_ids or [])
+
+    def is_unlimited(self, user_id: str) -> bool:
+        return user_id in self.unlimited_user_ids
 
     async def initialize(self) -> None:
         await self.pool.execute("""
@@ -102,6 +107,8 @@ class QuotaStore:
         """)
 
     async def reserve_tokens(self, user_id: str, amount: int) -> None:
+        if self.is_unlimited(user_id):
+            return
         if amount <= 0 or amount > min(self.limit, self.global_limit):
             raise HTTPException(429, "Request exceeds the daily hosted token limit")
         async with self.pool.acquire() as connection, connection.transaction():
@@ -125,6 +132,8 @@ class QuotaStore:
                 raise HTTPException(429, "Hosted beta capacity has been reached for today")
 
     async def settle_tokens(self, user_id: str, reserved: int, actual: int) -> None:
+        if self.is_unlimited(user_id):
+            return
         async with self.pool.acquire() as connection, connection.transaction():
             for quota_user_id in (user_id, self.aggregate_user_id):
                 await connection.execute("""
@@ -133,6 +142,8 @@ class QuotaStore:
                 """, quota_user_id, reserved, actual)
 
     async def reserve_meeting(self, user_id: str, seconds: int) -> None:
+        if self.is_unlimited(user_id):
+            return
         if seconds <= 0 or seconds > min(self.meeting_minutes, self.global_meeting_minutes) * 60:
             raise HTTPException(429, "Recording exceeds the daily hosted meeting limit")
         async with self.pool.acquire() as connection, connection.transaction():
@@ -156,6 +167,8 @@ class QuotaStore:
                 raise HTTPException(429, "Hosted beta meeting capacity has been reached for today")
 
     async def refund_meeting(self, user_id: str, seconds: int) -> None:
+        if self.is_unlimited(user_id):
+            return
         async with self.pool.acquire() as connection, connection.transaction():
             for quota_user_id in (user_id, self.aggregate_user_id):
                 await connection.execute("""
@@ -251,6 +264,7 @@ async def lifespan(app: FastAPI):
         configured.daily_global_token_limit,
         configured.daily_meeting_minutes,
         configured.daily_global_meeting_minutes,
+        configured.unlimited_user_ids,
     )
     app.state.hosted_gpu_slots = asyncio.BoundedSemaphore(configured.max_concurrent_hosted_jobs)
     app.state.pool = pool

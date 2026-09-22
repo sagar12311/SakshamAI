@@ -204,6 +204,14 @@ def test_first_request_cannot_bypass_quota():
         asyncio.run(quota.reserve_meeting("new-user", 61))
 
 
+def test_owner_can_bypass_daily_quota_without_bypassing_other_guards():
+    quota = main.QuotaStore(None, 100, 200, 1, 2, ["owner-user"])
+    asyncio.run(quota.reserve_tokens("owner-user", 10_000))
+    asyncio.run(quota.settle_tokens("owner-user", 10_000, 10_000))
+    asyncio.run(quota.reserve_meeting("owner-user", 10_000))
+    asyncio.run(quota.refund_meeting("owner-user", 10_000))
+
+
 @pytest.mark.parametrize("invited,anonymous,role,expected", [
     (True, False, "authenticated", 200),
     (False, False, "authenticated", 403),
