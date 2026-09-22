@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import asyncpg
 import httpx
 import jwt
+from app import history
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -269,12 +270,13 @@ async def lifespan(app: FastAPI):
     app.state.hosted_gpu_slots = asyncio.BoundedSemaphore(configured.max_concurrent_hosted_jobs)
     app.state.pool = pool
     await app.state.quota.initialize()
+    await history.initialize(pool)
     yield
     await pool.close()
 
 
 app = FastAPI(title="Saksham Public Gateway", version="0.1.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=settings().cors_origins, allow_methods=["GET", "POST"],
+app.add_middleware(CORSMiddleware, allow_origins=settings().cors_origins, allow_methods=["GET", "POST", "PATCH", "DELETE"],
                    allow_headers=["Authorization", "Content-Type", "X-Saksham-Consent-Confirmed", "X-Saksham-Provider-Key"])
 
 
@@ -441,3 +443,6 @@ async def transcribe(
         raise
     finally:
         slots.release()
+
+
+history.install(app, get_user, chat, ChatRequest, ChatMessage, select_provider)

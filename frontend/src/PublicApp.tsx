@@ -3,8 +3,8 @@ import { createClient, type Session } from '@supabase/supabase-js';
 import { Clock3, FileText, Mic2, Radio, ShieldCheck, Square, Users } from 'lucide-react';
 import './components/Meeting/MeetingWorkspace.css';
 import './PublicApp.css';
+import SavedChat from './SavedChat';
 
-type Message = { role: 'user' | 'assistant'; content: string };
 type Mode = 'hosted' | 'byok';
 type Workspace = 'chat' | 'meetings';
 type TranscriptSegment = {
@@ -107,62 +107,6 @@ function AuthScreen({ onSession }: { onSession: (session: Session) => void }) {
     </main>;
 }
 
-function PublicChat({ session }: { session: Session }) {
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [input, setInput] = useState('');
-    const [mode, setMode] = useState<Mode>('hosted');
-    const [providerUrl, setProviderUrl] = useState('https://api.openai.com/v1');
-    const [providerKey, setProviderKey] = useState('');
-    const [model, setModel] = useState('');
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
-
-    const send = async (event: FormEvent) => {
-        event.preventDefault();
-        const text = input.trim();
-        if (!text || busy || !gatewayUrl) return;
-        if (mode === 'byok' && !providerKey) return setError('Enter your provider key for this session.');
-        const next = [...messages, { role: 'user' as const, content: text }];
-        setMessages(next);
-        setInput('');
-        setBusy(true);
-        setError('');
-        try {
-            const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${session.access_token}`,
-                    ...(mode === 'byok' ? { 'X-Saksham-Provider-Key': providerKey } : {}),
-                },
-                body: JSON.stringify({ messages: next, mode, provider_url: mode === 'byok' ? providerUrl : undefined, model: model || undefined }),
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(payload.detail || 'Unable to reach Saksham.');
-            const content = payload.choices?.[0]?.message?.content;
-            if (!content) throw new Error('The provider returned no response.');
-            setMessages(current => [...current, { role: 'assistant', content }]);
-        } catch (requestError) {
-            setError(requestError instanceof Error ? requestError.message : 'Unable to send message.');
-        } finally {
-            setBusy(false);
-        }
-    };
-
-    return <section className="public-content chat-content">
-        <section className="provider-card">
-            <div className="section-heading"><div><p className="eyebrow">Assistant</p><h2>New conversation</h2></div><span className="session-status"><span />Private session</span></div>
-            <div className="mode-choice">
-                <button className={mode === 'hosted' ? 'selected' : ''} aria-pressed={mode === 'hosted'} onClick={() => setMode('hosted')}>Saksham Hosted</button>
-                <button className={mode === 'byok' ? 'selected' : ''} aria-pressed={mode === 'byok'} onClick={() => setMode('byok')}>Use my API key</button>
-            </div>
-            {mode === 'hosted' ? <p className="muted">Hosted use is available to approved beta accounts. Prompts are processed transiently and are not saved as chat history.</p> : <div className="byok-fields"><input aria-label="Provider URL" value={providerUrl} onChange={event => setProviderUrl(event.target.value)} /><input aria-label="Provider API key" type="password" placeholder="Provider API key (session only)" value={providerKey} onChange={event => setProviderKey(event.target.value)} /><input aria-label="Model" placeholder="Model (optional)" value={model} onChange={event => setModel(event.target.value)} /></div>}
-        </section>
-        <section className="messages" aria-live="polite">{messages.length === 0 ? <div className="empty-chat"><img className="brand-mark" src="/saksham-mark.svg" alt="" /><div><h3>How can I help?</h3><p className="muted">Start a conversation with Saksham. Desktop automation is not included in this public beta.</p></div></div> : messages.map((message, index) => <article className={message.role} key={`${message.role}-${index}`}><strong>{message.role === 'assistant' ? 'Saksham' : 'You'}</strong><p>{message.content}</p></article>)}</section>
-        <form className="composer" onSubmit={send}><input value={input} onChange={event => setInput(event.target.value)} placeholder="Ask Saksham…" disabled={busy} /><button disabled={busy}>{busy ? 'Thinking…' : 'Send'}</button></form>
-        {error && <p className="notice">{error}</p>}
-    </section>;
-}
 
 export function PublicMeetings({ session, gateway = gatewayUrl }: { session: Session; gateway?: string }) {
     const [consent, setConsent] = useState(false);
@@ -324,5 +268,5 @@ export default function PublicApp() {
     }, []);
     if (!configured) return <main className="public-shell auth-shell"><section className="auth-card"><h1>Public beta is not configured</h1><p className="muted">Set the Supabase and gateway variables in the deployment environment.</p></section></main>;
     if (!session) return <AuthScreen onSession={setSession} />;
-    return <main className="public-shell workspace-shell"><PublicHeader workspace={workspace} setWorkspace={setWorkspace} />{workspace === 'chat' ? <PublicChat session={session} /> : <PublicMeetings session={session} />}</main>;
+    return <main className="public-shell workspace-shell"><PublicHeader workspace={workspace} setWorkspace={setWorkspace} /><div hidden={workspace !== 'chat'}><SavedChat key={session.user.id} session={session} gateway={gatewayUrl!} /></div>{workspace === 'meetings' && <PublicMeetings session={session} />}</main>;
 }

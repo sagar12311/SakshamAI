@@ -156,7 +156,10 @@ frontend with fake public configuration.
 
 - The compose file does not deploy the desktop backend, so its automation and
   system-control endpoints are not reachable by public users.
-- Postgres stores only per-user/day token and meeting-duration counters.
+- Postgres stores usage counters and account-owned projects, conversations, and
+  message history. Chats are retained until the user deletes them; deleting a
+  project keeps its chats. Provider API keys and meeting audio are never stored
+  in this database. This is server-side storage, not end-to-end encryption.
 - BYOK keys are accepted only in the request header and are not persisted.
 - BYOK provider URLs must be HTTPS and match `ALLOWED_BYOK_HOSTS`, preventing
   users from turning the gateway into an internal-network proxy.
