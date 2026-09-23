@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => {
                     name: 'public-security-headers',
                     generateBundle() {
                         this.emitFile({ type: 'asset', fileName: '_headers', source: headers });
+                        this.emitFile({ type: 'asset', fileName: '_routes.json', source: JSON.stringify({ version: 1, include: ['/v1/*'], exclude: [] }) });
                     },
                 }],
             },

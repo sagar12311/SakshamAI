@@ -76,6 +76,26 @@ not a hardware safety guarantee.
 
 ### 4. Tunnel and first invited-user test
 
+For a domain-free beta, Tailscale Funnel can expose the loopback-bound gateway
+on HTTPS port 443. Configure Cloudflare Pages production variables
+`SAKSHAM_GATEWAY_ORIGIN` with the stable Funnel HTTPS origin and
+`VITE_SAKSHAM_GATEWAY_URL` with the Pages site origin. The Pages Function under
+`/v1/*` forwards only gateway API requests. The gateway still verifies every
+account token, and the Mac must remain online. Keep the private GPU and
+Postgres ports off Funnel. A quick `trycloudflare.com` tunnel is for temporary
+testing and should not be used as the production API address.
+
+To check the Funnel route and unauthenticated boundary, run:
+
+```bash
+tailscale funnel status --json
+curl --fail https://YOUR-FUNNEL-NAME.ts.net/ready
+curl -i https://YOUR-FUNNEL-NAME.ts.net/v1/projects  # expect 401
+```
+
+The browser calls `/v1/*` on its own Pages origin, so users do not need the
+Tailscale client or a browser connection to the Funnel hostname.
+
 Create a named, remotely managed Cloudflare Tunnel. Its published application
 route must be `api.saksham.ai` → **HTTP `gateway:8080`**. The tunnel connector
 is `cloudflared`; the destination service is `gateway`, not `cloudflared` or
