@@ -85,11 +85,14 @@ account token, and the Mac must remain online. Keep the private GPU and
 Postgres ports off Funnel. A quick `trycloudflare.com` tunnel is for temporary
 testing and should not be used as the production API address.
 
-To check the Funnel route and unauthenticated boundary, run:
+Check the Funnel route from a device outside the tailnet before using it as
+`SAKSHAM_GATEWAY_ORIGIN`. A check on the Mac can resolve the hostname to its
+private Tailscale address and appear healthy even when public ingress fails.
+Then check the unauthenticated boundary:
 
 ```bash
 tailscale funnel status --json
-curl --fail https://YOUR-FUNNEL-NAME.ts.net/ready
+curl --fail https://YOUR-FUNNEL-NAME.ts.net/ready # from outside the tailnet
 curl -i https://YOUR-FUNNEL-NAME.ts.net/v1/projects  # expect 401
 ```
 
