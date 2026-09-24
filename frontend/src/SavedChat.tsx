@@ -40,7 +40,14 @@ export default function SavedChat({ session, gateway, workspace = 'chat', onWork
         try { response = await fetch(`${gateway}${path}`, { method, headers: { Authorization: `Bearer ${token.current}`, 'Content-Type': 'application/json', ...(providerKey ? { 'X-Saksham-Provider-Key': providerKey } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }); }
         catch { throw new Error('Connection lost. Reload history or retry the same message when connected.'); }
         const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not save or load this conversation. Please try again.');
+        if (!response.ok) {
+            const fallback = response.status >= 500
+                ? `The chat server is temporarily unreachable (HTTP ${response.status}). Your saved history is not deleted. Reload history to check message delivery before retrying.`
+                : response.status === 401
+                    ? 'Your session has expired. Sign in again to continue.'
+                    : 'Could not save or load this conversation. Please try again.';
+            throw new Error(typeof data.detail === 'string' ? data.detail : fallback);
+        }
         return data;
     }, [gateway]);
 
@@ -143,7 +150,7 @@ export default function SavedChat({ session, gateway, workspace = 'chat', onWork
             {projects.map(p => <details key={p.id} className="chat-project"><summary>{p.name}</summary><div className="project-actions"><button disabled={busy || Boolean(pending)} onClick={() => newChat(p.id)}>New chat</button><button onClick={() => setDialog({ kind: 'project-rename', id: p.id, value: p.name })}>Rename</button><button onClick={() => setDialog({ kind: 'project-delete', id: p.id, value: p.name })}>Delete</button></div>{conversations.filter(c => c.project_id === p.id).map(row)}</details>)}
             {!projects.length && <p className="sidebar-empty">Group related conversations.</p>}
             <h3>Recents</h3>{conversations.map(row)}{!conversations.length && <p className="sidebar-empty">Your saved chats will appear here.</p>}
-            <button className="history-refresh" onClick={() => { void refresh().then(() => active ? load(active) : undefined).catch(e => setError(e.message)); }}>Reload history</button>
+            <button className="history-refresh" onClick={() => { void refresh().then(() => active ? load(active) : undefined).then(() => setError('')).catch(e => setError(e.message)); }}>Reload history</button>
         </aside>
         <section className="saved-chat-main" aria-label="Conversation" hidden={workspace !== 'chat'}>
             <header className="saved-chat-heading"><h2>{detail?.conversation.title || 'New conversation'}</h2>{detail && <div className="conversation-actions"><button disabled={generating} onClick={() => void patchChat({ pinned: !detail.conversation.pinned })}>{detail.conversation.pinned ? 'Unpin' : 'Pin'}</button><button disabled={generating} onClick={() => setDialog({ kind: 'chat-rename', id: active!, value: detail.conversation.title })}>Rename</button><button disabled={generating} onClick={() => setDialog({ kind: 'chat-delete', id: active!, value: detail.conversation.title })}>Delete</button></div>}</header>

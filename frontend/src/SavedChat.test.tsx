@@ -10,6 +10,20 @@ describe('saved conversations', () => {
     beforeEach(() => { sessionStorage.clear(); Element.prototype.scrollIntoView = vi.fn(); });
     afterEach(() => vi.unstubAllGlobals());
 
+    it('explains HTML tunnel failures and clears the notice after history recovers', async () => {
+        let offline = true;
+        vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+            if (offline) return { ok: false, status: 530, json: async () => { throw new Error('HTML tunnel error'); } };
+            return { ok: true, json: async () => url.endsWith('/projects') ? [] : { items: [], next_offset: null } };
+        }));
+        render(<SavedChat session={session} gateway="https://gateway.test" />);
+        expect(await screen.findByRole('alert')).toHaveTextContent('HTTP 530');
+        expect(screen.getByRole('alert')).toHaveTextContent('saved history is not deleted');
+        offline = false;
+        fireEvent.click(screen.getByRole('button', { name: 'Reload history' }));
+        await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    });
+
     it('restores a saved chat without restoring its provider key', async () => {
         sessionStorage.setItem('saksham.active.alice', 'chat-1');
         vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => url.endsWith('/projects') ? [] : url.includes('?offset') ? { items: [chat], next_offset: null } : { conversation: chat, turns: [{ id: 1, request_id: 'req', user_content: 'Plan my work', assistant_content: 'Here is a plan', status: 'completed' }], next_before: null, context_limited: true } })));
