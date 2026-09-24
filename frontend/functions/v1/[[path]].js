@@ -18,6 +18,12 @@ export async function onRequest({ request, env }) {
     headers.delete('host');
     headers.delete('x-forwarded-for');
     headers.delete('x-real-ip');
+    // The free ngrok browser interstitial is not an API response. This header
+    // bypasses only that notice; gateway authentication remains mandatory.
+    headers.delete('ngrok-skip-browser-warning');
+    if (upstream.hostname.endsWith('.ngrok-free.dev') || upstream.hostname.endsWith('.ngrok-free.app')) {
+        headers.set('ngrok-skip-browser-warning', '1');
+    }
 
     try {
         const response = await fetch(new Request(upstream, { method: request.method, headers, body: request.method === 'GET' || request.method === 'HEAD' ? undefined : request.body, redirect: 'manual' }));
