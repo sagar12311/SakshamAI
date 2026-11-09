@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import asyncpg
 import httpx
 import jwt
-from app import history
+from app import history, voice
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     max_hosted_meeting_upload_seconds: int = Field(default=900, ge=1, le=3_600)
     max_concurrent_hosted_jobs: int = Field(default=1, ge=1, le=4)
     hosted_enabled: bool = False
+    voice_enabled: bool = False
+    voice_worker_url: str = 'ws://host.docker.internal:8999/stream'
+    voice_worker_key: str = ''
+    voice_max_session_seconds: int = Field(default=600, ge=30, le=1800)
     beta_invite_only: bool = True
     beta_user_ids: list[str] = []
     unlimited_user_ids: list[str] = []
@@ -271,6 +275,8 @@ async def lifespan(app: FastAPI):
     app.state.pool = pool
     await app.state.quota.initialize()
     await history.initialize(pool)
+    if configured.voice_enabled:
+        await voice.initialize(pool)
     yield
     await pool.close()
 
@@ -446,3 +452,4 @@ async def transcribe(
 
 
 history.install(app, get_user, chat, ChatRequest, ChatMessage, select_provider)
+voice.install(app, get_user, settings)

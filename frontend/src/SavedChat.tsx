@@ -9,7 +9,7 @@ type Turn = { id: number; request_id: string; user_content: string; assistant_co
 type Detail = { conversation: Conversation; turns: Turn[]; next_before: number | null; context_limited: boolean };
 type Pending = { conversation: string; request: string; text: string };
 
-export default function SavedChat({ session, gateway, workspace = 'chat', onWorkspaceChange, children }: { session: Session; gateway: string; workspace?: 'chat' | 'meetings'; onWorkspaceChange?: (workspace: 'chat' | 'meetings') => void; children?: ReactNode }) {
+export default function SavedChat({ session, gateway, workspace = 'chat', onWorkspaceChange, children }: { session: Session; gateway: string; workspace?: 'chat' | 'meetings' | 'voice'; onWorkspaceChange?: (workspace: 'chat' | 'meetings' | 'voice') => void; children?: ReactNode }) {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [active, setActive] = useState<string | null>(null);
@@ -59,7 +59,7 @@ export default function SavedChat({ session, gateway, workspace = 'chat', onWork
             all.push(...page.items); offset = page.next_offset;
         } while (offset !== null && alive.current);
         const list = await api('/v1/projects');
-        if (alive.current) { setConversations(all); setProjects(list); }
+        if (alive.current) { setConversations(all.filter(c => c.model !== 'personaplex')); setProjects(list); }
     }, [api]);
 
     const load = useCallback(async (id: string, older?: number) => {
@@ -143,6 +143,7 @@ export default function SavedChat({ session, gateway, workspace = 'chat', onWork
         {sidebar && <button className="sidebar-scrim" aria-label="Close chat sidebar" onClick={() => setSidebar(false)} />}
         <aside className={`chat-sidebar ${sidebar ? 'mobile-open' : ''}`} aria-label="Chat navigation">
             <div className="sidebar-top"><strong>Workspace</strong><button className="mobile-close" aria-label="Close chat sidebar" onClick={() => setSidebar(false)}><X size={16} /></button></div>
+            {import.meta.env.VITE_SAKSHAM_VOICE_ENABLED === 'true' && <nav className="workspace-navigation" aria-label="Voice workspace"><button aria-current={workspace === 'voice' ? 'page' : undefined} onClick={() => { onWorkspaceChange?.('voice'); setSidebar(false); }}>Voice</button></nav>}
             <nav className="workspace-navigation" aria-label="Public beta workspaces"><button aria-current={workspace === 'chat' ? 'page' : undefined} onClick={() => { onWorkspaceChange?.('chat'); setSidebar(false); }}>Chat</button><button aria-current={workspace === 'meetings' ? 'page' : undefined} onClick={() => { onWorkspaceChange?.('meetings'); setSidebar(false); }}>Meeting Intelligence</button></nav>
             <button className="new-chat" disabled={busy || Boolean(pending)} onClick={() => newChat()}><Plus size={16} />New chat</button>
             <h3><Pin size={13} />Pinned</h3>{conversations.filter(c => c.pinned).map(row)}{!conversations.some(c => c.pinned) && <p className="sidebar-empty">Pin a conversation to keep it here.</p>}
@@ -170,7 +171,7 @@ export default function SavedChat({ session, gateway, workspace = 'chat', onWork
             {pending && !busy && <div className="pending-message"><p>Delivery needs checking: “{pending.text.slice(0,100)}”</p><button onClick={() => void send(pending)}>Retry same message</button><button onClick={() => { setPending(null); setError(''); }}>Keep draft</button></div>}
             <form className="composer" onSubmit={e => { e.preventDefault(); void send(); }}><input aria-label="Message" maxLength={12000} value={input} onChange={e => setInput(e.target.value)} placeholder="Message Saksham…" disabled={generating || loading || Boolean(pending)} /><button disabled={generating || loading || Boolean(pending) || !input.trim()}>Send</button></form>
         </section>
-        {workspace === 'meetings' && <div className="saved-meeting-main">{children}</div>}
+        {workspace !== 'chat' && <div className="saved-meeting-main">{children}</div>}
         {dialog && <dialog ref={dialogRef} className="chat-dialog" onCancel={() => setDialog(null)}><form onSubmit={submitDialog}><h2>{dialog.kind.endsWith('delete') ? 'Confirm deletion' : dialog.kind === 'project-create' ? 'Create project' : 'Rename'}</h2>{dialog.kind.endsWith('delete') ? <p>{dialog.kind === 'project-delete' ? `Delete “${dialog.value}”? Its chats will be kept outside the project.` : `Permanently delete “${dialog.value}” and its messages?`}</p> : <label>Name<input autoFocus required maxLength={dialog.kind === 'chat-rename' ? 160 : 100} value={dialog.value} onChange={e => setDialog({ ...dialog, value: e.target.value })} /></label>}<div><button type="button" onClick={() => setDialog(null)}>Cancel</button><button disabled={!dialog.value.trim()}>{dialog.kind.endsWith('delete') ? 'Delete' : 'Save'}</button></div></form></dialog>}
     </section>;
 }

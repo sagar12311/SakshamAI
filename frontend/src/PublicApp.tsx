@@ -4,9 +4,10 @@ import { Clock3, FileText, Mic2, Radio, ShieldCheck, Square, Users } from 'lucid
 import './components/Meeting/MeetingWorkspace.css';
 import './PublicApp.css';
 import SavedChat from './SavedChat';
+import PublicVoice from './PublicVoice';
 
 type Mode = 'hosted' | 'byok';
-type Workspace = 'chat' | 'meetings';
+type Workspace = 'chat' | 'meetings' | 'voice';
 type TranscriptSegment = {
     start_ms?: number;
     end_ms?: number;
@@ -268,5 +269,5 @@ export default function PublicApp() {
     }, []);
     if (!configured) return <main className="public-shell auth-shell"><section className="auth-card"><h1>Public beta is not configured</h1><p className="muted">Set the Supabase and gateway variables in the deployment environment.</p></section></main>;
     if (!session) return <AuthScreen onSession={setSession} />;
-    return <main className="public-shell workspace-shell"><PublicHeader /><SavedChat key={session.user.id} session={session} gateway={gatewayUrl!} workspace={workspace} onWorkspaceChange={setWorkspace}>{workspace === 'meetings' && <PublicMeetings session={session} />}</SavedChat></main>;
+    return <main className="public-shell workspace-shell"><PublicHeader /><SavedChat key={session.user.id} session={session} gateway={gatewayUrl!} workspace={workspace} onWorkspaceChange={setWorkspace}>{workspace === 'meetings' && <PublicMeetings session={session} />}{workspace === 'voice' && <PublicVoice key={session.user.id} session={session} gateway={gatewayUrl!} />}</SavedChat></main>;
 }

@@ -1,0 +1,8 @@
+# Separate CPU environment; do not install into PersonaPlex's environment.
+faster-whisper==1.2.1
+av==16.0.1
+sphn==0.2.1
+numpy>=1.26,<3
+fastapi>=0.109,<1
+uvicorn[standard]>=0.27,<1
+websockets>=15,<16

@@ -15,6 +15,10 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-["https://saksham.ai"]}
       ALLOWED_BYOK_HOSTS: ${ALLOWED_BYOK_HOSTS:-["api.openai.com"]}
       HOSTED_ENABLED: ${HOSTED_ENABLED:-false}
+      VOICE_ENABLED: ${VOICE_ENABLED:-false}
+      VOICE_WORKER_URL: ${VOICE_WORKER_URL:-ws://host.docker.internal:8999/stream}
+      VOICE_WORKER_KEY: ${VOICE_WORKER_KEY:-}
+      VOICE_MAX_SESSION_SECONDS: ${VOICE_MAX_SESSION_SECONDS:-600}
       BETA_INVITE_ONLY: ${BETA_INVITE_ONLY:-true}
       BETA_USER_IDS: ${BETA_USER_IDS:-[]}
       # These specific invited UUIDs bypass daily quotas; concurrency and request-size guards remain active.

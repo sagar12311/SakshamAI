@@ -23,12 +23,13 @@ export default defineConfig(({ mode }) => {
     }
     const supabaseOrigin = new URL(env.VITE_SUPABASE_URL!).origin;
     const gatewayOrigin = new URL(env.VITE_SAKSHAM_GATEWAY_URL!).origin;
+    const voiceOrigin = gatewayOrigin.replace(/^https:/, 'wss:');
     const headers = `/*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${supabaseOrigin} ${gatewayOrigin}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'
+  Permissions-Policy: camera=(), microphone=(self), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${supabaseOrigin} ${gatewayOrigin} ${voiceOrigin}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'
 `;
     return {
         plugins: [react(), {

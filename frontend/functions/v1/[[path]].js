@@ -27,6 +27,8 @@ export async function onRequest({ request, env }) {
 
     try {
         const response = await fetch(new Request(upstream, { method: request.method, headers, body: request.method === 'GET' || request.method === 'HEAD' ? undefined : request.body, redirect: 'manual' }));
+        // Preserve the WebSocket upgrade; reconstructing a Response loses its socket.
+        if (response.status === 101 && request.headers.get('upgrade')?.toLowerCase() === 'websocket') return response;
         if (response.status >= 300 && response.status < 400) return new Response('Gateway redirect refused', { status: 502 });
         const responseHeaders = new Headers(response.headers);
         responseHeaders.delete('access-control-allow-origin');
