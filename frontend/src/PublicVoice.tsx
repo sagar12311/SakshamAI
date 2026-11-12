@@ -4,6 +4,7 @@ import './PublicVoice.css';
 
 type Event = { id: number; role: 'user' | 'assistant'; content: string; remembered: boolean };
 type Conversation = { id: string; title: string; updated_at?: string };
+type Summary = { draft: string | null; approved: string | null };
 type Run = { stopped: boolean; socket?: WebSocket; stream?: MediaStream; audio?: AudioContext; worklet?: AudioWorkletNode; timer?: number; next: number; paused: boolean; sources: Set<AudioBufferSourceNode> };
 
 function dispose(run: Run) {
@@ -23,6 +24,8 @@ export default function PublicVoice({ session, gateway }: { session: Session; ga
     const [state, setState] = useState<'idle' | 'connecting' | 'live' | 'saving'>('idle');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [summary, setSummary] = useState<Summary>({draft:null,approved:null});
+    const [summaryBusy, setSummaryBusy] = useState(false);
     const runRef = useRef<Run>();
     const alive = useRef(true);
     const token = useRef(session.access_token);
@@ -42,7 +45,7 @@ export default function PublicVoice({ session, gateway }: { session: Session; ga
     }, [api]);
 
     const load = async (id: string) => {
-        selection.current = id; setActive(id); setEvents([]); setLoading(true); setError('');
+        selection.current = id; setActive(id); setEvents([]); setSummary({draft:null,approved:null}); setLoading(true); setError('');
         try {
             let after: number | null = 0;
             const rows: Event[] = [];
@@ -50,7 +53,8 @@ export default function PublicVoice({ session, gateway }: { session: Session; ga
                 const page = await api(`/v1/voice/conversations/${id}/events?after=${after}`);
                 rows.push(...page.items); after = page.next_after;
             } while (after !== null && alive.current && selection.current === id);
-            if (alive.current && selection.current === id) setEvents(rows);
+            const savedSummary = await api(`/v1/voice/conversations/${id}/summary`);
+            if (alive.current && selection.current === id) { setEvents(rows); setSummary(savedSummary); }
         } catch (e) { if (alive.current) setError((e as Error).message); }
         finally { if (alive.current) setLoading(false); }
     };
@@ -82,7 +86,7 @@ export default function PublicVoice({ session, gateway }: { session: Session; ga
             if (!id) {
                 const created = await api('/v1/voice/conversations','POST');
                 if (run.stopped) return;
-                id = created.id; setActive(id); selection.current = id; setEvents([]);
+                id = created.id; setActive(id); selection.current = id; setEvents([]); setSummary({draft:null,approved:null});
                 void refresh().catch(() => undefined);
             }
             await run.audio.audioWorklet.addModule('/voice-audio-worklet.js');
@@ -134,6 +138,8 @@ export default function PublicVoice({ session, gateway }: { session: Session; ga
                         setEvents(previous => previous.some(e => e.id === event.event.id) ? previous : [...previous,event.event]);
                     } else if (event.type === 'paused') {
                         dispose(run); setState('idle'); void refresh().catch(() => undefined);
+                        setSummaryBusy(true);
+                        void api(`/v1/voice/conversations/${id}/summary/draft`,'POST').then(result => { if (alive.current && selection.current === id) setSummary(result); }).catch(e => { if (alive.current && selection.current === id) setError(`Transcript saved, but summary was not generated: ${e.message}`); }).finally(() => { if (alive.current) setSummaryBusy(false); });
                     } else if (event.type === 'error') fail(event.detail);
                 } catch (e) { fail((e as Error).message); }
             };
@@ -156,10 +162,10 @@ export default function PublicVoice({ session, gateway }: { session: Session; ga
     const remember = async (event: Event) => {
         try {
             const updated = await api(`/v1/voice/conversations/${active}/events/${event.id}`, 'PATCH', { remembered: !event.remembered });
-            if (alive.current) setEvents(previous => previous.map(e => e.id === updated.id ? updated : e));
+            if (alive.current) { setEvents(previous => previous.map(e => e.id === updated.id ? updated : e)); setSummary({draft:null,approved:null}); }
         } catch (e) { if (alive.current) setError((e as Error).message); }
     };
-    const busy = state !== 'idle';
+    const busy = state !== 'idle' || summaryBusy;
     return <section className="voice-workspace">
         <header><h1>Talk with Saksham</h1><p>A natural conversation, with a transcript you can return to.</p></header>
         <div className="voice-history-actions">
@@ -173,8 +179,15 @@ export default function PublicVoice({ session, gateway }: { session: Session; ga
             {state === 'live' ? <button onClick={pause}>Pause and save</button> : <button disabled={!consent || busy || loading} onClick={() => void start()}>{active ? 'Resume conversation' : 'Start talking'}</button>}
             {state === 'connecting' && <button onClick={() => { if (runRef.current) dispose(runRef.current); setState('idle'); }}>Cancel</button>}
         </div>
-        <p className="voice-privacy">Remembered details apply when you resume. Pause and save before leaving this page. Spoken replies and transcription run separately; captions can arrive out of speaking order.</p>
+        <p className="voice-privacy">Remembered details apply when you resume. Forgetting a detail removes it from remembered facts and summaries; its transcript remains in history and may still appear in recent context until you delete the conversation. Pause and save before leaving. Captions can arrive out of speaking order.</p>
         {error && <p role="alert" className="notice">{error}</p>}
+        <section className="voice-summary" aria-label="Conversation memory"><h2>Conversation memory</h2>
+            {summaryBusy && <p role="status">Preparing a summary for review…</p>}
+            {summary.draft && <><p>Review this draft carefully. Transcripts and summaries can be wrong.</p><p>{summary.draft}</p><button disabled={busy} onClick={async () => { try { setSummary(await api(`/v1/voice/conversations/${active}/summary/approve`,'POST',{draft:summary.draft})); } catch (e) { setError((e as Error).message); } }}>Approve summary</button></>}
+            {summary.approved && <><p>Approved for the next session:</p><p>{summary.approved}</p></>}
+            {active && <button disabled={busy || !events.length} onClick={async () => { setSummaryBusy(true); try { setSummary(await api(`/v1/voice/conversations/${active}/summary/draft`,'POST')); } catch (e) { setError((e as Error).message); } finally { setSummaryBusy(false); } }}>Generate summary</button>}
+            {(summary.draft || summary.approved) && <button disabled={busy} onClick={async () => { try { setSummary(await api(`/v1/voice/conversations/${active}/summary`,'DELETE')); } catch (e) { setError((e as Error).message); } }}>Discard summaries</button>}
+        </section>
         <div className="voice-transcript" aria-label="Voice transcript" aria-live="polite">{events.length === 0 && <p>Your saved transcript will appear here.</p>}{events.map(event => <article key={event.id}><strong>{event.role === 'user' ? 'You' : 'Saksham'}</strong><p>{event.content}</p>{event.role === 'user' && <button disabled={busy} aria-pressed={event.remembered} onClick={() => void remember(event)}>{event.remembered ? 'Forget this detail' : 'Remember this detail'}</button>}</article>)}</div>
     </section>;
 }

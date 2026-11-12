@@ -36,6 +36,7 @@ def rig(monkeypatch):
             await voice.initialize(pool)
             app.state.pool = pool
             app.state.hosted_gpu_slots = asyncio.BoundedSemaphore(1)
+            app.state.voice_slots = asyncio.BoundedSemaphore(1)
             yield
         finally:
             await pool.close()
@@ -70,7 +71,11 @@ def rig(monkeypatch):
 
     monkeypatch.setattr(voice,'connect',lambda *args,**kwargs: Worker())
     app = FastAPI(lifespan=lifespan)
-    voice.install(app,user,lambda:config)
+    from app.main import ChatMessage, ChatRequest
+    async def infer(request, caller, key):
+        assert caller.id == 'alice' and request.mode == 'hosted'
+        return {'choices':[{'message':{'content':'Confirmed preference: roasted makhana.'}}]}
+    voice.install(app,user,lambda:config,infer,ChatRequest,ChatMessage)
     with TestClient(app) as client:
         client.headers['Authorization'] = 'Bearer alice'
         cid = client.post('/v1/voice/conversations').json()['id']
@@ -135,3 +140,21 @@ def test_busy_and_disconnect_release_slot(rig):
         assert len(calls)==1
     talk(client,cid)
     assert len(calls)==2
+
+
+def test_summary_review_is_owned_and_in_context_only_after_approval(rig):
+    client,cid,calls,_ = rig
+    user,_ = talk(client,cid)
+    base = f'/v1/voice/conversations/{cid}'
+    assert client.post(base+'/summary/draft',headers={'Authorization':'Bearer bob'}).status_code==404
+    draft = client.post(base+'/summary/draft').json()
+    assert draft['draft'] and draft['approved'] is None
+    assert client.post(base+'/summary/approve',headers={'Authorization':'Bearer bob'},json={'draft':draft['draft']}).status_code==404
+    assert client.post(base+'/summary/approve',json={'draft':'outdated'}).status_code==409
+    assert client.post(base+'/summary/approve',json={'draft':draft['draft']}).json()['approved']==draft['draft']
+    talk(client,cid)
+    assert 'Confirmed preference: roasted makhana.' in json.loads(calls[-1].messages[0])['prompt']
+    assert client.patch(base+f"/events/{user['id']}",json={'remembered':True}).status_code==200
+    assert client.get(base+'/summary').json()=={'draft':None,'approved':None}
+    assert client.post(base+'/summary/approve',json={'draft':draft['draft']}).status_code==409
+    assert client.delete(base+'/summary',headers={'Authorization':'Bearer bob'}).status_code==404

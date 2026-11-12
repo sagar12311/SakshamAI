@@ -25,6 +25,25 @@ it('shows storage failure instead of claiming history was loaded', async () => {
     expect(await screen.findByRole('alert')).toHaveProperty('textContent','Voice is not enabled on this server yet');
 });
 
+it('requires explicit approval of an existing summary draft', async () => {
+    const calls = vi.fn().mockImplementation((url) => {
+        let result: unknown = [];
+        if (String(url).endsWith('/conversations')) result = [{id:'one',title:'Voice'}];
+        if (String(url).includes('/events?')) result = {items:[],next_after:null};
+        if (String(url).endsWith('/summary')) result = {draft:'Snack may be makhana.',approved:null};
+        if (String(url).endsWith('/summary/approve')) result = {draft:null,approved:'Snack may be makhana.'};
+        return Promise.resolve({ok:true,json:async()=>result});
+    });
+    vi.stubGlobal('fetch',calls);
+    render(<PublicVoice session={session} gateway="https://gateway.invalid" />);
+    await screen.findByRole('option',{name:'Voice ·'});
+    fireEvent.change(screen.getByRole('combobox',{name:'Voice history'}),{target:{value:'one'}});
+    await screen.findByText('Snack may be makhana.');
+    expect(calls.mock.calls.some(([url])=>String(url).endsWith('/summary/approve'))).toBe(false);
+    fireEvent.click(screen.getByRole('button',{name:'Approve summary'}));
+    await screen.findByText('Approved for the next session:');
+});
+
 it('authenticates without URL credentials, flushes on pause, and releases the microphone', async () => {
     const stop = vi.fn();
     const stream = {getTracks:()=>[{stop}]};
@@ -69,6 +88,6 @@ it('authenticates without URL credentials, flushes on pause, and releases the mi
     expect(socket.send).toHaveBeenCalledWith('{"type":"pause"}');
     act(()=>socket.onmessage?.({data:'{"type":"paused"}'}));
     expect(close).toHaveBeenCalled();
-    expect((screen.getByRole('button',{name:'Resume conversation'}) as HTMLButtonElement).disabled).toBe(false);
+    await waitFor(() => expect((screen.getByRole('button',{name:'Resume conversation'}) as HTMLButtonElement).disabled).toBe(false));
     view.unmount();
 });

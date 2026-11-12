@@ -10,3 +10,8 @@ CREATE TABLE IF NOT EXISTS voice_events (
 );
 CREATE INDEX IF NOT EXISTS voice_event_history ON voice_events(conversation_id,id);
 ALTER TABLE voice_events ADD COLUMN IF NOT EXISTS remembered BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS voice_summaries (
+ conversation_id UUID PRIMARY KEY REFERENCES chat_conversations(id) ON DELETE CASCADE,
+ draft TEXT, approved TEXT, revision BIGINT NOT NULL DEFAULT 0,
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

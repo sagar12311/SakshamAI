@@ -272,6 +272,7 @@ async def lifespan(app: FastAPI):
         configured.unlimited_user_ids,
     )
     app.state.hosted_gpu_slots = asyncio.BoundedSemaphore(configured.max_concurrent_hosted_jobs)
+    app.state.voice_slots = asyncio.BoundedSemaphore(1)
     app.state.pool = pool
     await app.state.quota.initialize()
     await history.initialize(pool)
@@ -452,4 +453,4 @@ async def transcribe(
 
 
 history.install(app, get_user, chat, ChatRequest, ChatMessage, select_provider)
-voice.install(app, get_user, settings)
+voice.install(app, get_user, settings, chat, ChatRequest, ChatMessage)
