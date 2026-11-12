@@ -46,9 +46,13 @@ unavailable Qwen must not erase a saved transcript or prevent voice from resumin
 
 ## Local app and review
 
-Use a local HTTPS frontend with a configured Supabase test session; set the public
-voice build flag and matching gateway origin/CORS. A normal localhost secure context
-may be used for development; ensure the gateway websocket Origin matches exactly.
+Use the localhost-only Vite config `vite.public.local.config.ts` with mode
+`voice-local`. Set VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (publishable/anon
+only), VITE_SAKSHAM_GATEWAY_URL=http://127.0.0.1:8081, and
+VITE_SAKSHAM_VOICE_ENABLED=true in an ignored `frontend/.env.voice-local` file.
+Set gateway CORS_ORIGINS to include `http://127.0.0.1:5173`, start Vite with
+`npm exec vite -- --config vite.public.local.config.ts --mode voice-local`, and
+open `http://127.0.0.1:5173`. This binds to loopback and is not a production build.
 Verify audio playback, microphone permissions, echo cancellation, interruption,
 pause, transcript persistence, explicit remember/forget, summary review/approval,
 resume, reload, deletion, and cross-account isolation. The microphone does not
