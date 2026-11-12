@@ -46,6 +46,15 @@ unavailable Qwen must not erase a saved transcript or prevent voice from resumin
 
 ## Local app and review
 
+The adapter uses PersonaPlex's natural male voice `NATM1.pt`. After updating
+the checkout, pause and save the active conversation, restart the voice adapter
+on port 8999, and reconnect to hear the new voice. The model server and gateway
+do not need rebuilding for this change.
+
+PersonaPlex generates live spoken replies independently. Qwen currently prepares
+summary drafts after pause/save; it does not answer live voice requests or execute
+tasks. Approved summaries are included as context on the next voice connection.
+
 Use the localhost-only Vite config `vite.public.local.config.ts` with mode
 `voice-local`. Set VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (publishable/anon
 only), VITE_SAKSHAM_GATEWAY_URL=http://127.0.0.1:8081, and

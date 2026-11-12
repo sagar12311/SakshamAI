@@ -112,7 +112,7 @@ async def stream(ws: WebSocket):
             if start.get('type')!='start' or not isinstance(prompt,str) or len(prompt)>14000:
                 raise ValueError('Invalid context')
             # Fixed local model destination; neither browser nor gateway can supply a URL.
-            query = urlencode({'voice_prompt':'NATF2.pt', 'text_prompt':prompt})
+            query = urlencode({'voice_prompt':'NATM1.pt', 'text_prompt':prompt})
             async with connect('ws://127.0.0.1:8998/api/chat?'+query, open_timeout=15, max_size=65536, max_queue=8, proxy=None) as model:
                 handshake = asyncio.create_task(asyncio.wait_for(model.recv(), 180))
                 disconnected = asyncio.create_task(ws.receive())
